@@ -31,7 +31,7 @@ export function checkResponseSla() {
      WHERE first_response_at IS NULL AND sla_alerted = 0 AND deleted_at IS NULL AND stage = 'Not Contacted' AND created_at <= ?`,
     minutesFromNow(-minutes),
   );
-  const managers = all<any>(`SELECT id FROM users WHERE role IN ('admin','sales_manager') AND status = 'active'`);
+  const managers = all<any>(`SELECT id FROM users WHERE role IN ('admin','sourcing_manager') AND status = 'active'`);
   for (const lead of late) {
     run('UPDATE leads SET sla_alerted = 1 WHERE id = ?', lead.id);
     notifyUrgent(lead.owner_id, 'New lead is waiting', `${lead.name} has had no response for ${minutes} minutes`, `/leads/${lead.id}`);
@@ -138,7 +138,7 @@ export function sendFollowUpReminders() {
 /** The people responsible for someone's follow-ups: managers, and site heads on that project. */
 function managersFor(ownerId: number, projectId: number | null) {
   const people = all<{ id: number }>(
-    `SELECT u.id FROM users u WHERE u.status = 'active' AND u.id != ? AND (u.role = 'sales_manager'
+    `SELECT u.id FROM users u WHERE u.status = 'active' AND u.id != ? AND (u.role = 'sourcing_manager'
        OR (u.role = 'site_head' AND u.id IN (SELECT user_id FROM user_projects WHERE project_id = ?)))`,
     ownerId, projectId ?? 0,
   );
@@ -270,7 +270,7 @@ export async function runScheduledReports() {
   if (schedule.daily && getSetting('report_last_daily', '') !== today) due.push('daily');
   if (schedule.weekly && now.getUTCDay() === 1 && getSetting('report_last_weekly', '') !== today) due.push('weekly');
   if (!due.length) return;
-  const people = all<any>(`SELECT id FROM users WHERE role IN ('admin','sales_manager','site_head') AND status = 'active'`);
+  const people = all<any>(`SELECT id FROM users WHERE role IN ('admin','sourcing_manager','site_head') AND status = 'active'`);
   for (const period of due) {
     setSetting(`report_last_${period}`, today);
     for (const p of people) await sendReportTo(p.id, period);

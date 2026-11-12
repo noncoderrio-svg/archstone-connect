@@ -1,6 +1,6 @@
 import { Download, Sparkles } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { ROLE_LABELS, SOURCES } from '../../../shared/domain.ts';
+import { ROLE_LABELS, SOURCES, isLeadRole } from '../../../shared/domain.ts';
 import { BarList, Funnel } from '../components/Charts.tsx';
 import { DatePill, FilterBar, FilterPill, dateBounds, toOptions, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
@@ -60,7 +60,7 @@ export default function Reports() {
       <FilterBar activeCount={activeCount} onClear={clear}>
         <DatePill label="Period" preset={f.date} from={f.from} to={f.to} onChange={(date, from, to) => set({ date, from, to })} />
         <FilterPill label="Project" value={f.project} options={projects?.projects.map((p: any) => ({ value: String(p.id), label: p.name })) ?? []} onChange={(project) => set({ project })} />
-        <FilterPill label="Assigned to" value={f.owner} options={directory?.users.filter((u: any) => ['sales', 'telecaller'].includes(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? []} onChange={(owner) => set({ owner })} />
+        <FilterPill label="Assigned to" value={f.owner} options={directory?.users.filter((u: any) => isLeadRole(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? []} onChange={(owner) => set({ owner })} />
         <FilterPill label="Source" value={f.source} options={toOptions(SOURCES)} onChange={(source) => set({ source })} />
       </FilterBar>
       {aiEnabled && allowed('ai.use') && (

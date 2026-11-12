@@ -97,7 +97,7 @@ test('the period, agent and project filters narrow the numbers', async () => {
   assert.deepEqual(one.map((a: any) => a.id), [teleId]);
   const otherProject = db.get('SELECT id FROM projects WHERE id != ? LIMIT 1', projectId).id;
   assert.equal((await call(`/api/performance?owner=${teleId}&project=${otherProject}`)).data.agents[0].due, 0);
-  assert.equal((await call(`/api/performance?role=sales`)).data.agents.every((a: any) => a.role === 'sales'), true);
+  assert.equal((await call(`/api/performance?role=closing_manager`)).data.agents.every((a: any) => a.role === 'closing_manager'), true);
 });
 
 test('agents see only themselves, even if they ask for someone else', async () => {

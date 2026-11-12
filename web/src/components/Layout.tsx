@@ -3,7 +3,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FocusEvent, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ROLE_LABELS, type Action } from '../../../shared/domain.ts';
+import { BOOKING_ROLES, CLOSING_ROLES, LEAD_ROLES, ROLE_LABELS, type Action } from '../../../shared/domain.ts';
 import { POPUP_KINDS, playChime } from '../lib/alerts.ts';
 import { api, connectLiveUpdates, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -20,17 +20,17 @@ interface NavItem { to: string; label: string; icon: ReactNode; group: NavGroup;
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={19} />, group: 'Workspace', mobile: true },
-  { to: '/dial', label: 'Calling', icon: <Phone size={19} />, group: 'Workspace', mobile: true, roles: ['admin', 'sales_manager', 'site_head', 'team_leader', 'sales', 'telecaller'] },
+  { to: '/dial', label: 'Calling', icon: <Phone size={19} />, group: 'Workspace', mobile: true, roles: ['admin', ...LEAD_ROLES] },
   { to: '/leads', label: 'Leads', icon: <Users size={19} />, group: 'Workspace', mobile: true },
   { to: '/inbox', label: 'WhatsApp Inbox', icon: <MessageCircle size={19} />, group: 'Workspace', mobile: true },
-  { to: '/followups', label: 'Follow-ups', icon: <AlarmClock size={19} />, group: 'Workspace', roles: ['admin', 'sales_manager', 'site_head', 'team_leader', 'sales', 'telecaller'] },
-  { to: '/performance', label: 'Performance', icon: <Award size={19} />, group: 'Workspace', roles: ['admin', 'sales_manager', 'site_head', 'team_leader', 'sales', 'telecaller'] },
+  { to: '/followups', label: 'Follow-ups', icon: <AlarmClock size={19} />, group: 'Workspace', roles: ['admin', ...LEAD_ROLES] },
+  { to: '/performance', label: 'Performance', icon: <Award size={19} />, group: 'Workspace', roles: ['admin', ...LEAD_ROLES] },
   { to: '/visits', label: 'Site Visits', icon: <CalendarCheck size={19} />, group: 'Sales', mobile: true },
   { to: '/calendar', label: 'Calendar', icon: <CalendarDays size={19} />, group: 'Sales' },
   { to: '/projects', label: 'Projects & Units', icon: <Building2 size={19} />, group: 'Sales' },
   { to: '/files', label: 'Property Files', icon: <FolderOpen size={19} />, group: 'Sales' },
-  { to: '/approvals', label: 'Approvals', icon: <BadgeCheck size={19} />, group: 'Sales', roles: ['admin', 'sales_manager', 'site_head', 'team_leader', 'sales'] },
-  { to: '/bookings', label: 'Bookings', icon: <ReceiptIndianRupee size={19} />, group: 'Sales', roles: ['admin', 'sales_manager', 'site_head', 'team_leader', 'sales'] },
+  { to: '/approvals', label: 'Approvals', icon: <BadgeCheck size={19} />, group: 'Sales', roles: ['admin', ...CLOSING_ROLES] },
+  { to: '/bookings', label: 'Bookings', icon: <ReceiptIndianRupee size={19} />, group: 'Sales', roles: [...BOOKING_ROLES] },
   { to: '/routing', label: 'Lead Routing', icon: <Route size={19} />, group: 'Marketing', need: 'settings.manage' },
   { to: '/campaigns', label: 'Broadcasts', icon: <Megaphone size={19} />, group: 'Marketing', need: 'campaign.create' },
   { to: '/partners', label: 'Channel Partners', icon: <Handshake size={19} />, group: 'Marketing', need: 'partner.manage' },

@@ -6,6 +6,7 @@ import { Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, SelectField, 
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { dateTime, googleCalendarLink } from '../lib/format.ts';
+import { isViewOnly } from '../../../shared/domain.ts';
 
 const TONE: Record<string, 'brand' | 'amber' | 'green' | 'red' | 'neutral'> = {
   Scheduled: 'brand', 'Checked In': 'amber', Completed: 'green', 'No Show': 'red', Cancelled: 'neutral',
@@ -85,7 +86,7 @@ export default function Visits() {
   });
   const open = rows.filter((v: any) => ['Scheduled', 'Checked In'].includes(v.status)).reverse();
   const past = rows.filter((v: any) => !['Scheduled', 'Checked In'].includes(v.status));
-  const works = user!.role !== 'marketing';
+  const works = !isViewOnly(user!.role);
 
   const list = (rows: any[]) => (
     <ul className="divide-y divide-line">

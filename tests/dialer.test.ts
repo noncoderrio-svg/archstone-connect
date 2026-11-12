@@ -62,7 +62,7 @@ before(async () => {
   await signIn('admin', 'owner@test.local');
   await signIn('tele1', 'telecaller1@demo.archstone.test');
   await signIn('tele2', 'telecaller2@demo.archstone.test');
-  await signIn('marketing', 'marketing@demo.archstone.test');
+  await signIn('marketing', 'payments@demo.archstone.test');
 });
 
 after(() => {
@@ -135,7 +135,7 @@ test('do-not-contact leads never reach the queue, and other staff cannot call th
   assert.equal((await users.tele1.post(`/api/leads/${lead.id}/touch`, { channel: 'sms' })).status, 422);
   db.run('UPDATE leads SET do_not_contact = 0 WHERE id = ?', lead.id);
   assert.equal((await users.tele2.post(`/api/dialer/start/${lead.id}`)).status, 404);
-  assert.equal((await users.marketing.post(`/api/dialer/start/${lead.id}`)).status, 403);
+  assert.equal((await users.marketing.post(`/api/dialer/start/${lead.id}`)).status, 404, 'Payment Follow-up cannot even see a lead without a booking');
 });
 
 test('SMS and email taps are recorded on the timeline', async () => {

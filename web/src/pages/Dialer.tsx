@@ -1,7 +1,7 @@
 import { ArrowLeft, Mail, MessageCircle, MessageSquareText, Phone, PhoneForwarded, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DISPOSITIONS } from '../../../shared/domain.ts';
+import { DISPOSITIONS, isLeadRole } from '../../../shared/domain.ts';
 import { FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { Badge, Button, Card, Empty, ErrorNote, Modal, Notice, PageHeader, Select, Spinner, TempBadge, TextField, Textarea, cx, useAction } from '../components/ui.tsx';
@@ -52,7 +52,7 @@ function NewListModal({ onClose }: { onClose: () => void }) {
       </Modal>
     );
   }
-  const callers = people?.users.filter((u: any) => ['telecaller', 'sales'].includes(u.role)) ?? [];
+  const callers = people?.users.filter((u: any) => isLeadRole(u.role)) ?? [];
   return (
     <Modal title="New calling list" onClose={onClose}>
       <div className="space-y-3">

@@ -3,7 +3,7 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { ALERT_DEFAULTS, ROLES, SOURCES } from '../../shared/domain.ts';
+import { ALERT_DEFAULTS, ROLES, SOURCES, isManager } from '../../shared/domain.ts';
 import {
   assertNotLocked, clearFailures, createSession, destroySession, destroyUserSessions, generatePassword, hashPassword,
   HttpError, adminNeedsTwoFactor, recordFailure, requirePermission, sessionRemembered, verifyPassword,
@@ -182,7 +182,7 @@ admin.get('/dashboard', (req, res) => {
     user.id,
   );
 
-  const queue = ['telecaller', 'sales'].includes(user.role)
+  const queue = ['telecaller', 'closing_manager'].includes(user.role)
     ? all(
         `SELECT l.id, l.name, l.source, l.stage, l.temperature, l.created_at, p.name AS project_name FROM leads l LEFT JOIN projects p ON p.id = l.project_id
          WHERE ${scope.sql} AND l.owner_id = ? AND l.stage IN ('Not Contacted','Contacted','Qualified')
@@ -202,21 +202,21 @@ admin.get('/dashboard', (req, res) => {
   );
 
   const reports = user.role === 'admin' ? [] : teamOf(user.id);
-  const teamFilter = reports.length || user.role === 'team_leader' ? `AND u.id IN (${[user.id, ...reports].map(Number).join(',')})` : '';
-  const leaderboard = ['admin', 'sales_manager', 'site_head', 'team_leader'].includes(user.role)
+  const teamFilter = reports.length || ['sourcing_manager', 'closing_manager'].includes(user.role) ? `AND u.id IN (${[user.id, ...reports].map(Number).join(',')})` : '';
+  const leaderboard = isManager(user.role)
     ? all(
         `SELECT u.id, u.name, u.role,
            (SELECT COUNT(*) FROM leads l WHERE l.owner_id = u.id AND l.deleted_at IS NULL) AS leads,
            (SELECT COUNT(*) FROM activities a WHERE a.actor_id = u.id AND a.type = 'call' AND a.created_at >= ?) AS calls_today,
            (SELECT COUNT(*) FROM site_visits v WHERE v.host_id = u.id AND v.status IN ('Checked In','Completed') AND v.scheduled_at >= ?) AS visits_month,
            (SELECT COUNT(*) FROM leads l WHERE l.owner_id = u.id AND l.stage = 'Booked' AND l.updated_at >= ?) AS booked_month
-         FROM users u WHERE u.role IN ('sales','telecaller') AND u.status = 'active' ${teamFilter}
+         FROM users u WHERE u.role IN ('closing_manager','telecaller') AND u.status = 'active' ${teamFilter}
          ORDER BY booked_month DESC, visits_month DESC, calls_today DESC LIMIT 8`,
         today, month, month,
       )
     : [];
 
-  const revenue = ['admin', 'sales_manager', 'site_head', 'team_leader'].includes(user.role)
+  const revenue = isManager(user.role)
     ? get<{ v: number }>(
         `SELECT COALESCE(SUM(a.amount_lakhs), 0) v FROM approvals a JOIN leads l ON l.id = a.lead_id
          WHERE ${scope.sql} AND a.type = 'booking' AND a.status = 'approved' AND a.reviewed_at >= ?`,
@@ -232,7 +232,7 @@ admin.get('/dashboard', (req, res) => {
       awaitingResponse: count(`l.first_response_at IS NULL AND l.stage = 'Not Contacted'`),
       unassigned: count('l.owner_id IS NULL'),
       unread: count('l.unread_count > 0'),
-      callsToday: activityCount('call', user.role === 'telecaller' || user.role === 'sales' ? `AND a.actor_id = ${Number(user.id)}` : ''),
+      callsToday: activityCount('call', !isManager(user.role) ? `AND a.actor_id = ${Number(user.id)}` : ''),
       bookedThisMonth: count(`l.stage = 'Booked' AND l.updated_at >= ?`, month),
       overdueTasks: get<{ n: number }>(
         `SELECT COUNT(*) n FROM tasks t JOIN leads l ON l.id = t.lead_id WHERE ${scope.sql} AND t.completed_at IS NULL AND t.due_at < ?`,
@@ -364,7 +364,7 @@ const settingKeys = {
   hold_hours: 24,
   discount_limit_percent: 2,
   business_hours: { start: 10, end: 19 },
-  mask_phone_roles: ['marketing'],
+  mask_phone_roles: [] as string[],
   record_calls: false,
   payment_plan: [] as { label: string; percent: number }[],
   routing_mode: 'round_robin',

@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BUYER_FIELDS, DISPOSITIONS, DOCUMENT_TYPES, LANGUAGES, LOST_REASONS, STAGES } from '../../../shared/domain.ts';
+import { BUYER_FIELDS, DISPOSITIONS, DOCUMENT_TYPES, LANGUAGES, LOST_REASONS, STAGES, isManager, isViewOnly, CLOSING_ROLES } from '../../../shared/domain.ts';
 import { openAssistant } from '../components/Assistant.tsx';
 import { LabelButton, LabelChip, useLabels } from '../components/Labels.tsx';
 import { Page } from '../components/Layout.tsx';
@@ -100,14 +100,14 @@ function HandoffModal({ id, onClose }: { id: number; onClose: () => void }) {
   const { busy, run } = useAction();
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (await run(() => api.post(`/leads/${id}/handoff`, { sales_id: Number(f.sales_id), notes: f.notes }), 'Lead handed to sales')) onClose();
+    if (await run(() => api.post(`/leads/${id}/handoff`, { sales_id: Number(f.sales_id), notes: f.notes }), 'Lead handed to closing manager')) onClose();
   };
   return (
-    <Modal title="Hand off to sales" onClose={onClose}>
+    <Modal title="Hand off to a closing manager" onClose={onClose}>
       <form onSubmit={submit} className="space-y-3">
-        <SelectField label="Sales person" required value={f.sales_id} onChange={(e) => setF({ ...f, sales_id: e.target.value })}>
+        <SelectField label="Closing manager" required value={f.sales_id} onChange={(e) => setF({ ...f, sales_id: e.target.value })}>
           <option value="">Choose</option>
-          {data?.users.filter((u: any) => u.role === 'sales').map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {data?.users.filter((u: any) => (CLOSING_ROLES as readonly string[]).includes(u.role)).map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </SelectField>
         <TextareaField label="Handoff notes" required hint="What the customer wants, and the best time to call." value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
         <div className="flex justify-end gap-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" busy={busy}>Hand off</Button></div>
@@ -378,16 +378,16 @@ export default function LeadDetail() {
   if (loading) return <Spinner />;
   if (error || !data) return <Page><ErrorNote>{error || 'Lead not found.'}</ErrorNote></Page>;
   const { lead, project, timeline, tasks, visits, approvals, calls, documents, booking } = data;
-  const leader = ['admin', 'sales_manager', 'site_head', 'team_leader'].includes(user!.role);
+  const leader = isManager(user!.role);
   const addManagerNote = async () => {
     if (await run(() => api.post(`/leads/${id}/manager-note`, { body: managerNote }), 'Manager note added')) { setManagerNote(''); void reload(); }
   };
   const buyer: Record<string, string> = JSON.parse(lead.profile || '{}');
   const close = () => { setModal(null); void reload(); void reloadNext(); };
-  const readOnly = user!.role === 'marketing';
+  const readOnly = isViewOnly(user!.role);
   const language = LANGUAGES.find((l) => l.code === lead.language)?.label;
-  const canHandoff = ['team_leader', 'site_head', 'sales_manager', 'admin'].includes(user!.role) || (user!.role === 'telecaller' && lead.owner_id === user!.id);
-  const canBook = ['sales', 'team_leader', 'site_head', 'sales_manager', 'admin'].includes(user!.role);
+  const canHandoff = isManager(user!.role) || (user!.role === 'telecaller' && lead.owner_id === user!.id);
+  const canBook = isManager(user!.role);
 
   const addNote = async () => {
     if (await run(() => postOrQueue(`/leads/${id}/note`, { body: note }))) { setNote(''); void reload(); }

@@ -1,6 +1,6 @@
 import { CalendarCheck, Clock, Flame, Phone, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ROLE_LABELS } from '../../../shared/domain.ts';
+import { ROLE_LABELS, isLeadRole, isManager } from '../../../shared/domain.ts';
 import { BarList, Funnel } from '../components/Charts.tsx';
 import { DatePill, FilterBar, FilterPill, dateBounds, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
@@ -17,7 +17,7 @@ const STATS: Record<string, (s: any) => { label: string; value: any; hint?: stri
     { label: 'Unread WhatsApp', value: s.unread },
     { label: 'Overdue follow-ups', value: s.overdueTasks, alert: s.overdueTasks > 0 },
   ],
-  sales: (s) => [
+  closing_manager: (s) => [
     { label: 'My leads', value: s.totalLeads },
     { label: 'Hot leads', value: s.hot },
     { label: 'Booked this month', value: s.bookedThisMonth },
@@ -29,10 +29,8 @@ const STATS: Record<string, (s: any) => { label: string; value: any; hint?: stri
     { label: 'Revenue this month', value: lakhs(s.revenueLakhs) },
     { label: 'Approvals waiting', value: s.pendingApprovals, alert: s.pendingApprovals > 0 },
   ],
-  marketing: (s) => [
-    { label: 'Total leads', value: s.totalLeads },
-    { label: 'New today', value: s.newToday },
-    { label: 'Hot leads', value: s.hot },
+  payment_followup: (s) => [
+    { label: 'Buyers', value: s.totalLeads },
     { label: 'Booked this month', value: s.bookedThisMonth },
   ],
   default: (s) => [
@@ -64,7 +62,7 @@ function Targets({ p }: { p: any }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const { f, set, clear, activeCount } = useFilters(['date', 'from', 'to', 'project', 'owner'] as const);
-  const manager = ['admin', 'sales_manager', 'site_head', 'team_leader', 'marketing'].includes(user!.role);
+  const manager = isManager(user!.role);
   const query = new URLSearchParams();
   const bounds = dateBounds(f.date, f.from, f.to);
   if (bounds.from) query.set('created_from', bounds.from);
@@ -75,7 +73,7 @@ export default function Dashboard() {
   const { data: brief } = useApi('/brief', ['leads', 'visits', 'inbox']);
   const { data: projects } = useApi(manager ? '/projects' : null);
   const { data: directory } = useApi(manager ? '/directory' : null);
-  const showTeamPerformance = ['admin', 'sales_manager', 'site_head', 'team_leader'].includes(user!.role);
+  const showTeamPerformance = isManager(user!.role);
   const { data: performance } = useApi(showTeamPerformance ? `/performance?${query}` : null, ['leads']);
   if (loading && !data) return <Spinner />;
   if (error || !data) return <Page><ErrorNote>{error}</ErrorNote></Page>;
@@ -85,7 +83,7 @@ export default function Dashboard() {
   const stats = (STATS[user!.role] ?? STATS.default)(data.stats);
   const firstName = user!.name.split(' ')[0];
   const showTeam = data.leaderboard.length > 0;
-  const worker = ['telecaller', 'sales'].includes(user!.role);
+  const worker = !isManager(user!.role) && isLeadRole(user!.role);
 
   const finishTask = async (id: number) => {
     await api.post(`/tasks/${id}/complete`);
@@ -99,7 +97,7 @@ export default function Dashboard() {
         <FilterBar activeCount={activeCount} onClear={clear}>
           <DatePill label="Leads created" preset={f.date} from={f.from} to={f.to} onChange={(date, from, to) => set({ date, from, to })} />
           <FilterPill label="Project" value={f.project} options={projects?.projects.map((p: any) => ({ value: String(p.id), label: p.name })) ?? []} onChange={(project) => set({ project })} />
-          <FilterPill label="Assigned to" value={f.owner} options={directory?.users.filter((u: any) => ['sales', 'telecaller'].includes(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? []} onChange={(owner) => set({ owner })} />
+          <FilterPill label="Assigned to" value={f.owner} options={directory?.users.filter((u: any) => isLeadRole(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? []} onChange={(owner) => set({ owner })} />
         </FilterBar>
       )}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

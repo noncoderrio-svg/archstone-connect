@@ -8,6 +8,7 @@ import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { placeCall } from '../lib/calling.ts';
 import { dateTime, localToUtc, timeAgo } from '../lib/format.ts';
+import { isLeadRole, isManager } from '../../../shared/domain.ts';
 
 /** Tomorrow at 10:00 India time, as a stored UTC value. */
 function tomorrowMorning() {
@@ -51,7 +52,7 @@ export default function FollowUps() {
   const [custom, setCustom] = useState<any>(null);
   const [when, setWhen] = useState('');
   const { busy, run } = useAction();
-  const manager = !['sales', 'telecaller'].includes(user!.role);
+  const manager = isManager(user!.role);
 
   const query = new URLSearchParams({ view: f.view });
   for (const k of ['q', 'owner', 'project', 'type'] as const) if (f[k]) query.set(k, f[k]);
@@ -80,7 +81,7 @@ export default function FollowUps() {
         <DatePill label="Due" preset={f.date} from={f.from} to={f.to} extra={FUTURE_PRESETS} onChange={(date, from, to) => set({ date, from, to })} />
         <FilterPill label="Action" value={f.type} options={toOptions(data?.types ?? [])} onChange={(type) => set({ type })} />
         <FilterPill label="Project" value={f.project} options={projects?.projects.map((p: any) => ({ value: String(p.id), label: p.name })) ?? []} onChange={(project) => set({ project })} />
-        {manager && <FilterPill label="Assigned to" value={f.owner} options={directory?.users.filter((u: any) => ['sales', 'telecaller', 'team_leader', 'site_head', 'sales_manager'].includes(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? []} onChange={(owner) => set({ owner })} />}
+        {manager && <FilterPill label="Assigned to" value={f.owner} options={directory?.users.filter((u: any) => isLeadRole(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? []} onChange={(owner) => set({ owner })} />}
       </FilterBar>
       {error && <ErrorNote>{error}</ErrorNote>}
       {loading && !data && <Spinner />}

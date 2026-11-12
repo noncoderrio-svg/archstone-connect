@@ -120,7 +120,7 @@ sales.post('/projects/:id/units', requirePermission('inventory.manage'), (req, r
 });
 
 sales.post('/units/:id/hold', (req, res) => {
-  if (!['admin', 'site_head', 'sales', 'team_leader', 'sales_manager'].includes(req.user.role)) throw new HttpError(403, 'You cannot hold units.');
+  if (!['admin', 'site_head', 'sourcing_manager', 'closing_manager', 'telecaller'].includes(req.user.role)) throw new HttpError(403, 'You cannot hold units.');
   const unitId = Number(req.params.id);
   const { lead_id } = z.object({ lead_id: z.number().int() }).parse(req.body);
   const lead = workableLead(req.user, lead_id);
@@ -149,7 +149,7 @@ sales.post('/units/:id/release', (req, res) => {
 const reviewersFor = (projectId: number | null) =>
   all<any>(
     `SELECT DISTINCT u.id FROM users u LEFT JOIN user_projects up ON up.user_id = u.id
-     WHERE u.status = 'active' AND (u.role IN ('admin','sales_manager') OR (u.role = 'site_head' AND up.project_id = ?))`,
+     WHERE u.status = 'active' AND (u.role IN ('admin','sourcing_manager') OR (u.role = 'site_head' AND up.project_id = ?))`,
     projectId,
   );
 

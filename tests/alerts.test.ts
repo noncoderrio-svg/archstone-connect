@@ -61,7 +61,7 @@ before(async () => {
   admin = await signIn('owner@test.local');
   tele = await signIn('telecaller1@demo.archstone.test');
   teleId = (await call('GET', '/api/auth/me', tele)).data.user.id;
-  managerId = db.get(`SELECT id FROM users WHERE role = 'sales_manager'`).id;
+  managerId = db.get(`SELECT id FROM users WHERE role = 'sourcing_manager'`).id;
   leadId = (await call('GET', '/api/leads', tele)).data.leads[0].id;
 });
 
@@ -189,7 +189,7 @@ test('someone else cannot snooze a follow-up on a lead they cannot work', async 
   const id = addTask(db.minutesFromNow(30));
   const other = await call('GET', '/api/auth/me', tele);
   assert.ok(other.data.user);
-  const marketing = await signIn('marketing@demo.archstone.test');
+  const marketing = await signIn('payments@demo.archstone.test');
   assert.equal((await call('POST', `/api/tasks/${id}/snooze`, marketing, { minutes: 30 })).status >= 403, true);
 });
 

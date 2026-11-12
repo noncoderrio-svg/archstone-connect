@@ -1,3 +1,4 @@
+import { isManager, isViewOnly } from '../../shared/domain.ts';
 import express, { Router } from 'express';
 import QRCode from 'qrcode';
 import { z } from 'zod';
@@ -73,7 +74,7 @@ function briefItems(userId: number, userScope: ReturnType<typeof leadScope>) {
   const count = (sql: string, ...p: (string | number)[]) => get<{ n: number }>(sql, ...p)!.n;
   // People who lead a team also need the team's picture, not only their own work.
   const role = get<{ role: string }>('SELECT role FROM users WHERE id = ?', userId)?.role ?? '';
-  if (['admin', 'sales_manager', 'site_head', 'team_leader'].includes(role)) {
+  if (isManager(role)) {
     const waiting = count(`SELECT COUNT(*) n FROM leads l WHERE ${userScope.sql} AND l.first_response_at IS NULL AND l.stage = 'Not Contacted'`, ...userScope.params);
     if (waiting) items.push(`${waiting} lead${waiting > 1 ? 's are' : ' is'} still waiting for a first response.`);
     const approvals = count(`SELECT COUNT(*) n FROM approvals a JOIN leads l ON l.id = a.lead_id WHERE ${userScope.sql} AND a.status = 'pending'`, ...userScope.params);
@@ -145,7 +146,7 @@ insights.delete('/saved-filters/:id', (req, res) => {
 insights.get('/calendar', (req, res) => {
   const q = z.object({ from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(req.query);
   const scope = leadScope(req.user);
-  const mine = ['sales', 'telecaller'].includes(req.user.role) ? 'AND t.owner_id = ?' : '';
+  const mine = !isManager(req.user.role) ? 'AND t.owner_id = ?' : '';
   const tasks = all(
     `SELECT t.id, t.lead_id, t.type AS title, t.due_at AS at, l.name AS lead_name, u.name AS owner, 'task' AS kind
      FROM tasks t JOIN leads l ON l.id = t.lead_id JOIN users u ON u.id = t.owner_id
@@ -164,7 +165,7 @@ insights.get('/calendar', (req, res) => {
 // ---------- Targets ----------
 insights.put('/users/:id/target', (req, res) => {
   assertCan(req.user, 'reports.view');
-  if (req.user.role === 'marketing') throw new HttpError(403, 'You cannot set targets.');
+  if (isViewOnly(req.user.role)) throw new HttpError(403, 'You cannot set targets.');
   const b = z.object({ calls: z.number().int().min(0), visits: z.number().int().min(0), bookings: z.number().int().min(0) }).parse(req.body);
   run(
     `INSERT INTO targets(user_id, month, calls, visits, bookings) VALUES(?, ?, ?, ?, ?)
@@ -176,8 +177,8 @@ insights.put('/users/:id/target', (req, res) => {
 });
 
 insights.get('/targets', requirePermission('reports.view'), (req, res) => {
-  if (req.user.role === 'marketing') throw new HttpError(403, 'Targets are not available for your role.');
-  const people = all<any>(`SELECT id, name, role FROM users WHERE role IN ('sales','telecaller') AND status = 'active' ORDER BY name`);
+  if (isViewOnly(req.user.role)) throw new HttpError(403, 'Targets are not available for your role.');
+  const people = all<any>(`SELECT id, name, role FROM users WHERE role IN ('closing_manager','telecaller') AND status = 'active' ORDER BY name`);
   res.json({ people: people.map((p) => ({ ...p, progress: targetProgress(p.id) })) });
 });
 

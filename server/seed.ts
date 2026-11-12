@@ -5,6 +5,7 @@ import { config } from './config.ts';
 import { all, get, minutesFromNow, nowIso, run, tx } from './db.ts';
 import { generatePassword, hashPassword } from './auth.ts';
 import { ingestLead, logActivity, rescore } from './services/leads.ts';
+import { migrateRoles } from './migrations.ts';
 
 const DATA_DIR = dirname(config.dbPath);
 const CREDENTIALS_FILE = join(DATA_DIR, 'first-login-passwords.txt');
@@ -74,7 +75,7 @@ async function addUser(name: string, email: string, role: string, projectIds: nu
 /** In demo mode, gives the sample telecallers their own simulated numbers. */
 function ensureDemoNumbers() {
   if (!config.demoMode || get('SELECT 1 AS x FROM wa_numbers LIMIT 1')) return;
-  const staff = all<any>(`SELECT id, name FROM users WHERE email LIKE '%@demo.archstone.test' AND role IN ('telecaller','sales') ORDER BY id`);
+  const staff = all<any>(`SELECT id, name FROM users WHERE email LIKE '%@demo.archstone.test' AND role IN ('telecaller','closing_manager') ORDER BY id`);
   staff.forEach((u, i) => {
     run(
       `INSERT INTO wa_numbers(label, display_number, phone_number_id, user_id, daily_limit) VALUES(?, ?, ?, ?, 250)`,
@@ -85,6 +86,7 @@ function ensureDemoNumbers() {
 
 /** Creates what every installation needs. Safe to run on each start. */
 export async function ensureBaseData() {
+  migrateRoles();
   ensureDefaults();
   if (get('SELECT 1 AS x FROM users LIMIT 1')) {
     ensureDemoNumbers();
@@ -115,11 +117,11 @@ async function addDemoData() {
   const ids = Object.fromEntries(all<any>('SELECT id, name FROM projects').map((p) => [p.name, p.id as number]));
   const [bliss, square, dar, bait] = [ids['Skyline Residences'], ids['Harbour Square'], ids['Parkview Heights'], ids['Lakeside Towers']];
 
-  await addUser('Demo Sales Manager', 'manager@demo.archstone.test', 'sales_manager');
+  await addUser('Demo Sourcing Manager', 'manager@demo.archstone.test', 'sourcing_manager');
   const head = await addUser('Demo Site Head', 'sitehead@demo.archstone.test', 'site_head', [bliss, square]);
-  await addUser('Demo Marketing', 'marketing@demo.archstone.test', 'marketing');
-  const salesA = await addUser('Demo Sales One', 'sales1@demo.archstone.test', 'sales');
-  const salesB = await addUser('Demo Sales Two', 'sales2@demo.archstone.test', 'sales');
+  await addUser('Demo Payment Follow-up', 'payments@demo.archstone.test', 'payment_followup', [bliss, square]);
+  const salesA = await addUser('Demo Closing One', 'closing1@demo.archstone.test', 'closing_manager');
+  const salesB = await addUser('Demo Closing Two', 'closing2@demo.archstone.test', 'closing_manager');
   const teleA = await addUser('Demo Telecaller One', 'telecaller1@demo.archstone.test', 'telecaller');
   const teleB = await addUser('Demo Telecaller Two', 'telecaller2@demo.archstone.test', 'telecaller');
 

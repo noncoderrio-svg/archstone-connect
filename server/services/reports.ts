@@ -1,3 +1,4 @@
+import { LEAD_ROLES, isViewOnly } from '../../shared/domain.ts';
 import { existsSync } from 'node:fs';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
@@ -22,7 +23,7 @@ export function buildReport(user: SessionUser, days: number, q: Record<string, u
   const count = (extra: string, ...p: (string | number)[]) =>
     get<{ n: number }>(`SELECT COUNT(*) n FROM leads l WHERE ${scope.sql} AND ${extra}`, ...scope.params, ...p)!.n;
 
-  const canSeeSpend = ['admin', 'marketing'].includes(user.role);
+  const canSeeSpend = user.role === 'admin';
   const spend = all<any>(
     'SELECT source, SUM(amount_inr) AS amount FROM ad_spend WHERE spend_date >= ? AND spend_date <= ? AND (? = 0 OR project_id = ?) GROUP BY source',
     since.slice(0, 10), until, projectId, projectId,
@@ -50,7 +51,7 @@ export function buildReport(user: SessionUser, days: number, q: Record<string, u
     since, ...scope.params, since,
   );
 
-  const team = user.role === 'marketing' ? [] : all<any>(
+  const team = isViewOnly(user.role) ? [] : all<any>(
     `SELECT u.id, u.name, u.role,
        (SELECT COUNT(*) FROM leads l WHERE l.owner_id = u.id AND l.deleted_at IS NULL) AS leads,
        (SELECT COUNT(*) FROM activities a WHERE a.actor_id = u.id AND a.type = 'call' AND a.created_at >= ?) AS calls,
@@ -59,7 +60,7 @@ export function buildReport(user: SessionUser, days: number, q: Record<string, u
        (SELECT COUNT(*) FROM leads l WHERE l.owner_id = u.id AND l.stage = 'Booked') AS booked,
        (SELECT ROUND(AVG((julianday(l.first_response_at) - julianday(l.created_at)) * 1440), 1) FROM leads l
           WHERE (l.owner_id = u.id OR l.presales_id = u.id) AND l.first_response_at IS NOT NULL AND l.created_at >= ?) AS avg_response_minutes
-     FROM users u WHERE u.role IN ('sales','telecaller') AND u.status = 'active' AND (? = 0 OR u.id = ?) ORDER BY booked DESC, visits DESC`,
+     FROM users u WHERE u.role IN (${LEAD_ROLES.map((r) => `'${r}'`).join(',')}) AND u.status = 'active' AND (? = 0 OR u.id = ?) ORDER BY booked DESC, visits DESC`,
     since, since, since, since, ownerId, ownerId,
   );
 

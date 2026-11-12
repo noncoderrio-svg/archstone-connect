@@ -69,11 +69,11 @@ before(async () => {
   await new Promise((r) => server.once('listening', r));
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   await signIn('admin', 'owner@test.local');
-  await addUser('head', 'sales_manager');
-  await addUser('tlA', 'team_leader');
-  await addUser('tlB', 'team_leader');
+  await addUser('head', 'sourcing_manager');
+  await addUser('tlA', 'closing_manager');
+  await addUser('tlB', 'closing_manager');
   await addUser('agent1', 'telecaller');
-  await addUser('agent2', 'sales');
+  await addUser('agent2', 'closing_manager');
   await addUser('agent3', 'telecaller');
   await leadFor('agent1', '9744400001');
   await leadFor('agent2', '9744400002');
@@ -101,8 +101,8 @@ const shape = () => {
   report('agent3', 'tlB');
 };
 
-test('with no reporting lines, a Sales Manager keeps seeing everything', async () => {
-  assert.ok((await seen('head')).length >= 3);
+test('with no reporting lines, a Sourcing Manager sees only their own leads', async () => {
+  assert.ok(!(await seen('head')).some((n: string) => n.startsWith('Lead of agent')));
   assert.deepEqual(await seen('agent1'), ['Lead of agent1']);
 });
 

@@ -1,3 +1,4 @@
+import { LEAD_ROLES, isManager } from '../../shared/domain.ts';
 import type { SessionUser } from '../auth.ts';
 import { all, nowIso } from '../db.ts';
 import { teamOf } from './hierarchy.ts';
@@ -19,18 +20,17 @@ export function activityScore(onTime: number | null, connect: number | null, res
   return weight ? Math.round(parts.reduce((sum, [value, w]) => sum + value * w, 0) / weight) : null;
 }
 
-const TEAM_VIEWERS = ['admin', 'sales_manager', 'site_head', 'team_leader'];
 
 /** Who this person may compare. Sales staff and telecallers see only themselves. */
 function visibleAgents(user: SessionUser, q: Record<string, string>) {
-  const where = [`u.status = 'active'`, `u.role IN ('sales','telecaller','team_leader','site_head','sales_manager')`];
+  const where = [`u.status = 'active'`, `u.role IN (${LEAD_ROLES.map((r) => `'${r}'`).join(',')})`];
   const params: (string | number)[] = [];
-  if (!TEAM_VIEWERS.includes(user.role)) {
+  if (!isManager(user.role)) {
     where.push('u.id = ?');
     params.push(user.id);
   } else {
     const reports = user.role === 'admin' ? [] : teamOf(user.id);
-    if (reports.length || user.role === 'team_leader') {
+    if (reports.length || user.role === 'sourcing_manager' || user.role === 'closing_manager') {
       const people = [user.id, ...reports];
       where.push(`u.id IN (${people.map(() => '?').join(',')})`);
       params.push(...people);
@@ -114,7 +114,7 @@ export function agentPerformance(user: SessionUser, q: Record<string, string>) {
   return {
     agents,
     totals: { ...totals, on_time_rate: percent(totals.on_time, totals.on_time + totals.late + totals.missed) },
-    team_view: TEAM_VIEWERS.includes(user.role),
+    team_view: isManager(user.role),
     grace_minutes: GRACE_MINUTES,
     teams: all<{ team: string }>(`SELECT DISTINCT team FROM users WHERE team != '' ORDER BY team`).map((r) => r.team),
   };

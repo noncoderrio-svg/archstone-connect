@@ -1,6 +1,6 @@
 import { Copy, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { LANGUAGES, ROLES, ROLE_LABELS } from '../../../shared/domain.ts';
+import { LANGUAGES, ROLES, ROLE_LABELS, MANAGER_ROLES } from '../../../shared/domain.ts';
 import { CountTabs, FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { Badge, Button, Card, ErrorNote, Modal, Notice, PageHeader, SelectField, Spinner, TextField, useAction, useToast } from '../components/ui.tsx';
@@ -23,7 +23,6 @@ function PasswordModal({ value, onClose }: { value: string; onClose: () => void 
   );
 }
 
-const MANAGER_ROLES = ['admin', 'sales_manager', 'site_head', 'team_leader'];
 
 function TreeNode({ person, all, depth, onEdit, onMove }: { person: any; all: any[]; depth: number; onEdit: (u: any) => void; onMove: (u: any) => void }) {
   const reports = all.filter((u) => u.manager_id === person.id);
@@ -63,7 +62,7 @@ function Structure({ users, onEdit, reload }: { users: any[]; onEdit: (u: any) =
   };
   return (
     <Card className="p-4">
-      {!linked && <div className="mb-3"><Notice>No reporting lines yet, so access works by role. Edit each person and choose who they report to. Team Leaders and managers then see only their own team.</Notice></div>}
+      {!linked && <div className="mb-3"><Notice>No reporting lines yet, so access works by role. Edit each person and choose who they report to. Managers then see only their own team.</Notice></div>}
       <ul className="divide-y divide-line">
         {roots.map((u) => <TreeNode key={u.id} person={u} all={users} depth={0} onEdit={onEdit} onMove={(p) => { setTarget(''); setMoving(p); }} />)}
       </ul>

@@ -111,8 +111,8 @@ before(async () => {
   await signIn('admin', 'owner@test.local');
   await signIn('tele1', 'telecaller1@demo.archstone.test');
   await signIn('tele2', 'telecaller2@demo.archstone.test');
-  await signIn('sales1', 'sales1@demo.archstone.test');
-  await signIn('marketing', 'marketing@demo.archstone.test');
+  await signIn('sales1', 'closing1@demo.archstone.test');
+  await signIn('marketing', 'payments@demo.archstone.test');
   await signIn('head', 'sitehead@demo.archstone.test');
 });
 
@@ -125,12 +125,12 @@ after(() => {
 
 // ---------- Permissions ----------
 test('an admin can change a role, and it applies at once without a new login', async () => {
-  assert.equal((await users.sales1.get('/api/reports')).status, 403);
+  assert.equal((await users.tele2.get('/api/reports')).status, 403);
   const { data } = await users.admin.get('/api/permissions');
-  await users.admin.put('/api/permissions/role/sales', { actions: [...data.roles.sales, 'reports.view'] });
-  assert.equal((await users.sales1.get('/api/reports')).status, 200);
-  await users.admin.put('/api/permissions/role/sales', { actions: data.roles.sales });
-  assert.equal((await users.sales1.get('/api/reports')).status, 403);
+  await users.admin.put('/api/permissions/role/telecaller', { actions: [...data.roles.telecaller, 'reports.view'] });
+  assert.equal((await users.tele2.get('/api/reports')).status, 200);
+  await users.admin.put('/api/permissions/role/telecaller', { actions: data.roles.telecaller });
+  assert.equal((await users.tele2.get('/api/reports')).status, 403);
 });
 
 test('one person can be allowed or blocked apart from their role', async () => {
@@ -281,9 +281,9 @@ test('the admin can let someone broadcast without approval', async () => {
 test('property files upload, stay typed, and can be sent on WhatsApp', async () => {
   const upload = (c: Client, body: Buffer, q: string) => c.call('POST', `/api/media?${q}`, body, { 'Content-Type': 'application/octet-stream' });
   assert.equal((await upload(users.tele1, JPG, 'title=Photo&name=a.jpg')).status, 403, 'needs the permission');
-  assert.equal((await upload(users.marketing, Buffer.from('<html>'), 'title=Bad&name=a.html')).status, 415);
-  const jpg = await upload(users.marketing, JPG, 'title=Site%20photo&name=../../site.jpg');
-  const pdf = await upload(users.marketing, PDF, 'title=Brochure&name=brochure.pdf');
+  assert.equal((await upload(users.head, Buffer.from('<html>'), 'title=Bad&name=a.html')).status, 415);
+  const jpg = await upload(users.head, JPG, 'title=Site%20photo&name=../../site.jpg');
+  const pdf = await upload(users.head, PDF, 'title=Brochure&name=brochure.pdf');
   assert.equal(jpg.status, 201);
 
   const list = (await users.tele1.get('/api/media')).data.media;
@@ -304,7 +304,7 @@ test('property files upload, stay typed, and can be sent on WhatsApp', async () 
   assert.equal(msg.media_type, 'document');
 
   assert.equal((await users.tele1.call('DELETE', `/api/media/${jpg.data.id}`)).status, 403);
-  assert.equal((await users.marketing.call('DELETE', `/api/media/${jpg.data.id}`)).status, 200);
+  assert.equal((await users.head.call('DELETE', `/api/media/${jpg.data.id}`)).status, 200);
   assert.equal(readdirSync(join(dir, 'media')).length, 1, 'the file is gone from disk');
 });
 

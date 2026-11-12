@@ -1,6 +1,6 @@
 import { ArrowRight, Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ROLE_LABELS } from '../../../shared/domain.ts';
+import { ROLE_LABELS, LEAD_ROLES, isLeadRole } from '../../../shared/domain.ts';
 import { DatePill, FilterBar, FilterPill, dateBounds, filterRows, toOptions, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, PageHeader, Spinner, Stat } from '../components/ui.tsx';
@@ -67,7 +67,7 @@ export default function Performance() {
   });
   const team = data.team_view;
   const single = !team || Boolean(f.owner);
-  const people = directory?.users.filter((u: any) => ['sales', 'telecaller', 'team_leader', 'site_head', 'sales_manager'].includes(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? [];
+  const people = directory?.users.filter((u: any) => isLeadRole(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? [];
 
   return (
     <Page>
@@ -77,7 +77,7 @@ export default function Performance() {
         <DatePill label="Period" preset={f.date} from={f.from} to={f.to} onChange={(date, from, to) => set({ date, from, to })} />
         {team && <FilterPill label="Agent" value={f.owner} options={people} onChange={(owner) => set({ owner })} all="Everyone" />}
         <FilterPill label="Project" value={f.project} options={projects?.projects.map((p: any) => ({ value: String(p.id), label: p.name })) ?? []} onChange={(project) => set({ project })} />
-        {team && <FilterPill label="Role" value={f.role} options={[{ value: 'telecaller', label: ROLE_LABELS.telecaller }, { value: 'sales', label: ROLE_LABELS.sales }, { value: 'team_leader', label: ROLE_LABELS.team_leader }, { value: 'site_head', label: ROLE_LABELS.site_head }, { value: 'sales_manager', label: ROLE_LABELS.sales_manager }]} onChange={(role) => set({ role })} />}
+        {team && <FilterPill label="Role" value={f.role} options={LEAD_ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))} onChange={(role) => set({ role })} />}
         {team && !!data.teams.length && <FilterPill label="Team" value={f.team} options={toOptions(data.teams)} onChange={(t) => set({ team: t })} />}
         {team && !f.owner && <FilterPill label="Sort" value={f.sort} options={SORTS} onChange={(sort) => set({ sort })} clearable={false} />}
       </FilterBar>

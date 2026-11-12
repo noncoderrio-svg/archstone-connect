@@ -138,7 +138,7 @@ test('filters never widen what someone may see', async () => {
   const everyone = (await call('GET', '/api/leads?board=1')).data.total;
   assert.ok(mine.length < everyone);
   // Even when asking for another person's leads, only leads already visible may return.
-  const other = (await call('GET', '/api/users')).data.users.find((u: any) => u.role === 'sales');
+  const other = (await call('GET', '/api/users')).data.users.find((u: any) => u.role === 'closing_manager');
   const asked = (await call('GET', `/api/leads?owner=${other.id}&board=1`, telecaller)).data.leads.map((l: any) => l.id);
   assert.ok(asked.every((id: number) => mine.includes(id)));
   assert.ok((await call('GET', `/api/leads?owner=${other.id}&board=1`)).data.total >= asked.length);

@@ -110,7 +110,7 @@ function UnitModal({ unit, onClose }: { unit: any; onClose: () => void }) {
   const { data } = useApi('/leads?board=1');
   const [leadId, setLeadId] = useState('');
   const { busy, run } = useAction();
-  const canHold = ['admin', 'site_head', 'sales', 'team_leader', 'sales_manager'].includes(user!.role);
+  const canHold = ['admin', 'site_head', 'sourcing_manager', 'closing_manager', 'telecaller'].includes(user!.role);
   const hold = async () => { if (await run(() => api.post(`/units/${unit.id}/hold`, { lead_id: Number(leadId) }), 'Unit held')) onClose(); };
   const release = async () => { if (await run(() => api.post(`/units/${unit.id}/release`), 'Unit released')) onClose(); };
   return (

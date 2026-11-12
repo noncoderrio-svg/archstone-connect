@@ -1,7 +1,7 @@
 import { ArrowLeft, Bot, Clock, History, Megaphone, Pencil, Plus, Smartphone, StickyNote, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ROLE_LABELS } from '../../../shared/domain.ts';
+import { ROLE_LABELS, isViewOnly } from '../../../shared/domain.ts';
 import { CountTabs, DatePill, FilterBar, FilterPill, SearchBox, dateBounds, filterRows, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, IconButton, Modal, Notice, PageHeader, SelectField, Spinner, Stat, TextField, cx, useAction } from '../components/ui.tsx';
@@ -100,7 +100,7 @@ function ChatView({ leadId, num, onBack, onSwitch }: { leadId: number; num: numb
         </div>
         <span className="flex gap-1">
           <Link to={`/leads/${data.lead.id}`}><Button size="sm">Open lead</Button></Link>
-          {can('whatsapp.send') && user!.role !== 'marketing' && <Link to={`/inbox/${data.lead.id}`}><Button size="sm" variant="whatsapp">Reply</Button></Link>}
+          {can('whatsapp.send') && !isViewOnly(user!.role) && <Link to={`/inbox/${data.lead.id}`}><Button size="sm" variant="whatsapp">Reply</Button></Link>}
         </span>
       </div>
       {!!data.other_numbers.length && (

@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
-import { SOURCES, STAGES, TEMPLATE_VARS } from '../../shared/domain.ts';
+import { SOURCES, STAGES, TEMPLATE_VARS, isViewOnly } from '../../shared/domain.ts';
 import { HttpError, assertCan, permissionsFor, requirePermission } from '../auth.ts';
 import { config, whatsappLive } from '../config.ts';
 import { all, get, nowIso, run } from '../db.ts';
@@ -59,7 +59,7 @@ messaging.get('/inbox/:leadId', (req, res) => {
   ).reverse();
   const project = lead.project_id ? get<any>('SELECT name, brochure_url FROM projects WHERE id = ?', lead.project_id) : null;
   // Reading someone else's chat to monitor it must not hide it from them as unread.
-  if (req.user.role !== 'marketing' && lead.owner_id === req.user.id && lead.unread_count) {
+  if (!isViewOnly(req.user.role) && lead.owner_id === req.user.id && lead.unread_count) {
     run('UPDATE leads SET unread_count = 0 WHERE id = ?', lead.id);
     broadcast('inbox');
   }

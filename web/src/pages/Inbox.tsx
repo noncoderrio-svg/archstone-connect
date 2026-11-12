@@ -1,7 +1,7 @@
 import { ArrowLeft, Check, CheckCheck, Clock, FileText, FlaskConical, Film, Paperclip, Search, Send, Sparkles, StickyNote, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { STAGES } from '../../../shared/domain.ts';
+import { STAGES, isLeadRole, isViewOnly } from '../../../shared/domain.ts';
 import { DatePill, FilterPill, dateBounds, toOptions, useFilters } from '../components/Filters.tsx';
 import { Badge, Button, Empty, ErrorNote, Input, Modal, Notice, Select, Spinner, Textarea, cx, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
@@ -101,7 +101,7 @@ function Thread({ leadId }: { leadId: number }) {
   };
 
   const blocked = data.blockers.length > 0;
-  const readOnly = !can('whatsapp.send') || user!.role === 'marketing';
+  const readOnly = !can('whatsapp.send') || isViewOnly(user!.role);
   const timeline = [
     ...data.messages.map((m: any) => ({ ...m, kind: 'message' })),
     ...data.notes.map((n: any) => ({ ...n, kind: 'note', id: `note${n.id}` })),
@@ -121,7 +121,7 @@ function Thread({ leadId }: { leadId: number }) {
         {can('lead.reassign') && (
           <Select aria-label="Assign conversation" className="hidden h-8 w-36 text-[13px] sm:block" value={data.lead.owner_id ?? ''} onChange={(e) => assign(e.target.value)}>
             <option value="">Unassigned</option>
-            {directory?.users.filter((u: any) => ['sales', 'telecaller', 'team_leader', 'site_head', 'sales_manager'].includes(u.role)).map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {directory?.users.filter((u: any) => isLeadRole(u.role)).map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </Select>
         )}
         <span className="max-sm:hidden"><Badge tone={data.window_open ? 'green' : 'neutral'}>{data.window_open ? 'Window open' : 'Window closed'}</Badge></span>
@@ -269,7 +269,7 @@ export default function Inbox() {
             <div className="flex flex-wrap gap-1.5">
               <FilterPill label="Label" value={label} options={catalog.map((l) => ({ value: l.name, label: l.name }))} onChange={setLabel} />
               <DatePill label="Last message" preset={f.date} from={f.from} to={f.to} onChange={(date, from, to) => set({ date, from, to })} />
-              <FilterPill label="Assigned to" value={f.owner} options={[{ value: 'none', label: 'Unassigned' }, ...(directory?.users.filter((u: any) => ['sales', 'telecaller', 'team_leader', 'site_head', 'sales_manager'].includes(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? [])]} onChange={(owner) => set({ owner })} />
+              <FilterPill label="Assigned to" value={f.owner} options={[{ value: 'none', label: 'Unassigned' }, ...(directory?.users.filter((u: any) => isLeadRole(u.role)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? [])]} onChange={(owner) => set({ owner })} />
               <FilterPill label="Project" value={f.project} options={projects?.projects.map((p: any) => ({ value: String(p.id), label: p.name })) ?? []} onChange={(project) => set({ project })} />
               <FilterPill label="Stage" value={f.stage} options={toOptions(STAGES)} onChange={(stage) => set({ stage })} />
               <FilterPill label="Score" value={f.temperature} options={toOptions(['Hot', 'Warm', 'Cold'])} onChange={(temperature) => set({ temperature })} />

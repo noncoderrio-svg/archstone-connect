@@ -1,3 +1,4 @@
+import { MANAGER_ROLES, ROLE_LABELS, isManager } from '../../shared/domain.ts';
 import { HttpError } from '../auth.ts';
 import { all, get } from '../db.ts';
 
@@ -29,14 +30,13 @@ export function managerChain(userId: number): number[] {
   return chain;
 }
 
-const MANAGER_ROLES = ['admin', 'sales_manager', 'site_head', 'team_leader'];
 
 /** A reporting line must point at an active manager and can never form a loop. */
 export function assertManager(userId: number | null, managerId: number) {
   const manager = get<{ role: string; status: string }>('SELECT role, status FROM users WHERE id = ?', managerId);
   if (!manager) throw new HttpError(400, 'That manager was not found.');
   if (manager.status !== 'active') throw new HttpError(400, 'Choose an active manager.');
-  if (!MANAGER_ROLES.includes(manager.role)) throw new HttpError(400, 'Choose an Admin, Sales Manager, Site Head or Team Leader as manager.');
+  if (!isManager(manager.role)) throw new HttpError(400, `Choose a manager: ${MANAGER_ROLES.map((r) => ROLE_LABELS[r]).join(', ')}.`);
   if (userId === managerId) throw new HttpError(400, 'Someone cannot report to themselves.');
   if (userId && teamOf(userId).includes(managerId)) throw new HttpError(400, 'That would create a loop, because this manager already reports to them.');
 }

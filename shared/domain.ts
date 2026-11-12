@@ -7,17 +7,50 @@ export const COMPANY = {
   address: '',
 } as const;
 
-export const ROLES = ['admin', 'sales_manager', 'site_head', 'team_leader', 'marketing', 'sales', 'telecaller'] as const;
+/** Top to bottom. Every role list in the server and the screens comes from this file. */
+export const ROLES = ['admin', 'site_head', 'sourcing_manager', 'closing_manager', 'payment_followup', 'telecaller'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: 'Admin',
-  sales_manager: 'Sales Manager',
   site_head: 'Site Head',
-  team_leader: 'Team Leader',
-  marketing: 'Marketing',
-  sales: 'Sales Person',
-  telecaller: 'Pre-Sales Telecaller',
+  sourcing_manager: 'Sourcing Manager',
+  closing_manager: 'Closing Manager',
+  payment_followup: 'Payment Follow-up',
+  telecaller: 'Telecaller',
+};
+
+/** Roles from earlier versions, and the role each one became. Used once, at start-up. */
+export const LEGACY_ROLES: Record<string, Role> = {
+  sales_manager: 'sourcing_manager',
+  team_leader: 'closing_manager',
+  sales: 'closing_manager',
+  marketing: 'telecaller',
+};
+
+/** Roles that can have people reporting to them and can watch their team's work. */
+export const MANAGER_ROLES: readonly Role[] = ['admin', 'site_head', 'sourcing_manager', 'closing_manager'];
+/** Roles that work leads: calling, follow-ups, assignment and performance lists. */
+export const LEAD_ROLES: readonly Role[] = ['site_head', 'sourcing_manager', 'closing_manager', 'telecaller'];
+/** Roles a telecaller can hand a qualified lead to. */
+export const CLOSING_ROLES: readonly Role[] = ['site_head', 'sourcing_manager', 'closing_manager'];
+/** Roles that may view buyers but never work leads. */
+export const VIEW_ONLY_ROLES: readonly Role[] = ['payment_followup'];
+/** Roles that see bookings and payments. */
+export const BOOKING_ROLES: readonly Role[] = ['admin', 'site_head', 'sourcing_manager', 'closing_manager', 'payment_followup'];
+
+export const isManager = (role: string) => (MANAGER_ROLES as readonly string[]).includes(role);
+export const isLeadRole = (role: string) => (LEAD_ROLES as readonly string[]).includes(role);
+export const isViewOnly = (role: string) => (VIEW_ONLY_ROLES as readonly string[]).includes(role);
+
+/** Which leads each role sees, unless an admin sets something else for one person. */
+export const DEFAULT_SCOPE: Record<Role, 'all' | 'projects' | 'team' | 'own' | 'bookings'> = {
+  admin: 'all',
+  site_head: 'projects',
+  sourcing_manager: 'team',
+  closing_manager: 'team',
+  payment_followup: 'bookings',
+  telecaller: 'own',
 };
 
 export const STAGES = [
@@ -204,11 +237,10 @@ const EVERYONE: Action[] = ['lead.create', 'whatsapp.send', 'campaign.create', '
 /** Starting points. An admin can change any of these, by role or for one person. */
 export const PERMISSIONS: Record<Role, Action[]> = {
   admin: [...ACTIONS],
-  sales_manager: [...EVERYONE, 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage'],
   site_head: [...EVERYONE, 'lead.reassign', 'inventory.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage'],
-  team_leader: [...EVERYONE, 'lead.reassign', 'approval.review', 'reports.view', 'visit.checkin'],
-  marketing: ['campaign.create', 'ai.use', 'lead.import', 'template.manage', 'reports.view', 'media.manage'],
-  sales: [...EVERYONE, 'visit.checkin'],
+  sourcing_manager: [...EVERYONE, 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage'],
+  closing_manager: [...EVERYONE, 'lead.reassign', 'approval.review', 'reports.view', 'visit.checkin'],
+  payment_followup: ['ai.use'],
   telecaller: [...EVERYONE],
 };
 
@@ -218,6 +250,7 @@ export const DATA_SCOPES = [
   { value: 'team', label: 'Own and their team' },
   { value: 'projects', label: 'Assigned projects' },
   { value: 'all', label: 'All leads' },
+  { value: 'bookings', label: 'Buyers on assigned projects' },
 ] as const;
 
 /** Variables a WhatsApp template may use. */

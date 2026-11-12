@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import express, { Router } from 'express';
 import { z } from 'zod';
-import { DOCUMENT_TYPES, HANDOVER_STAGES } from '../../shared/domain.ts';
+import { BOOKING_ROLES, DOCUMENT_TYPES, HANDOVER_STAGES } from '../../shared/domain.ts';
 import { HttpError, requirePermission, type SessionUser } from '../auth.ts';
 import { config } from '../config.ts';
 import { all, get, getSetting, nowIso, run, tx } from '../db.ts';
@@ -96,7 +96,7 @@ postsales.get('/leads/:id/cost-sheet', (req, res) => {
 
 // ---------- Bookings ----------
 const bookingScope = (user: SessionUser) => {
-  if (user.role === 'telecaller' || user.role === 'marketing') throw new HttpError(403, 'Bookings are not available for your role.');
+  if (!(BOOKING_ROLES as readonly string[]).includes(user.role)) throw new HttpError(403, 'Bookings are not available for your role.');
   return leadScope(user);
 };
 

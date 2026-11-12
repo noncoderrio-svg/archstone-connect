@@ -523,6 +523,8 @@ CREATE TABLE IF NOT EXISTS report_runs (
 `);
 addColumn('wa_numbers', 'phone_app', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('wa_numbers', 'history_status', `TEXT NOT NULL DEFAULT ''`);
+addColumn('partners', 'manager_id', 'INTEGER REFERENCES users(id)');
+addColumn('partners', 'area', `TEXT NOT NULL DEFAULT ''`);
 
 type Row = Record<string, any>;
 type Params = SQLInputValue[];

@@ -109,9 +109,9 @@ before(async () => {
   users.admin = await signIn('owner@test.local');
   users.tele1 = await signIn('telecaller1@demo.archstone.test');
   users.tele2 = await signIn('telecaller2@demo.archstone.test');
-  users.sales1 = await signIn('sales1@demo.archstone.test');
+  users.sales1 = await signIn('closing1@demo.archstone.test');
   users.head = await signIn('sitehead@demo.archstone.test');
-  users.marketing = await signIn('marketing@demo.archstone.test');
+  users.marketing = await signIn('payments@demo.archstone.test');
   users.manager = await signIn('manager@demo.archstone.test');
 });
 

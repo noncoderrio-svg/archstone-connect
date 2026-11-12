@@ -1,6 +1,6 @@
 import { Plus, RefreshCw, Shuffle, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { SOURCES } from '../../../shared/domain.ts';
+import { SOURCES, isLeadRole } from '../../../shared/domain.ts';
 import { CountTabs, FilterBar, FilterPill, SearchBox, filterRows, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, IconButton, Modal, Notice, PageHeader, SelectField, Spinner, TextField, cx, useAction, useToast } from '../components/ui.tsx';
@@ -15,7 +15,7 @@ function RuleForm({ rule, onClose }: { rule: any; onClose: () => void }) {
   const { data: p } = useApi('/projects');
   const { busy, run } = useAction();
   const set = (k: string, v: unknown) => setF((s: any) => ({ ...s, [k]: v }));
-  const staff = d?.users.filter((u: any) => ['telecaller', 'sales', 'team_leader', 'site_head', 'sales_manager'].includes(u.role)) ?? [];
+  const staff = d?.users.filter((u: any) => isLeadRole(u.role)) ?? [];
   const flip = (id: number) => set('user_ids', f.user_ids.includes(id) ? f.user_ids.filter((x: number) => x !== id) : [...f.user_ids, id]);
   const save = async () => {
     const body = { ...f, project_id: f.project_id ? Number(f.project_id) : null, priority: Number(f.priority) };

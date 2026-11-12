@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { DEFAULT_SCOPE, isViewOnly, type Role } from '../../shared/domain.ts';
 import type { SessionUser } from '../auth.ts';
 import { HttpError } from '../auth.ts';
 import { get, getSetting, run } from '../db.ts';
@@ -65,16 +66,20 @@ export function leadScope(user: SessionUser): { sql: string; params: number[] } 
   if (user.role === 'admin') return { sql: 'l.deleted_at IS NULL', params: [] };
   const reports = teamOf(user.id);
   const leads = reports.length > 0;
-  // Reporting lines take over as soon as they are set. Until then, access stays as it always was.
-  const fallback = ({
-    sales_manager: leads ? 'team' : 'all',
-    marketing: 'all',
-    site_head: 'projects',
-    team_leader: 'team',
-  } as Record<string, string>)[user.role] ?? (leads ? 'team' : 'own');
+  // Each role has a default in shared/domain.ts. Anyone with people reporting to them also sees their team.
+  const fallback: string = DEFAULT_SCOPE[user.role as Role] ?? 'own';
   // An admin can widen or narrow any one person's view from the permissions screen.
-  const scope = user.data_scope || fallback;
+  const scope = user.data_scope || (fallback === 'own' && leads ? 'team' : fallback);
   if (scope === 'all') return { sql: 'l.deleted_at IS NULL', params: [] };
+  if (scope === 'bookings') {
+    // Buyers with a booking on one of this person's projects, and nothing else.
+    const ids = user.project_ids;
+    if (!ids.length) return { sql: '1 = 0', params: [] };
+    return {
+      sql: `l.deleted_at IS NULL AND EXISTS (SELECT 1 FROM bookings bk JOIN units bu ON bu.id = bk.unit_id WHERE bk.lead_id = l.id AND bu.project_id IN (${ids.map(() => '?').join(',')}))`,
+      params: ids,
+    };
+  }
 
   const people = [user.id, ...reports];
   const marks = people.map(() => '?').join(',');
@@ -87,8 +92,12 @@ export function leadScope(user: SessionUser): { sql: string; params: number[] } 
     if (!ids.length) return { sql: '1 = 0', params: [] };
     return { sql: `l.deleted_at IS NULL AND ${byProject}`, params: ids };
   }
-  if (scope === 'team') return { sql: `l.deleted_at IS NULL AND ${byTeam}`, params: [...people, ...people] };
-  return { sql: 'l.deleted_at IS NULL AND (l.owner_id = ? OR l.presales_id = ?)', params: [user.id, user.id] };
+  // A Sourcing Manager also sees leads from their own channel partners and from partners nobody owns yet.
+  const partners = user.role === 'sourcing_manager' && !user.data_scope
+    ? { sql: ' OR l.partner_id IN (SELECT x.id FROM partners x WHERE x.manager_id = ? OR x.manager_id IS NULL)', params: [user.id] }
+    : { sql: '', params: [] as number[] };
+  if (scope === 'team') return { sql: `l.deleted_at IS NULL AND (${byTeam}${partners.sql})`, params: [...people, ...people, ...partners.params] };
+  return { sql: `l.deleted_at IS NULL AND (l.owner_id = ? OR l.presales_id = ?${partners.sql})`, params: [user.id, user.id, ...partners.params] };
 }
 
 /** Returns the lead only if this user may see it. Responds 404 otherwise, so ids cannot be probed. */
@@ -99,10 +108,10 @@ export function visibleLead(user: SessionUser, leadId: number) {
   return lead;
 }
 
-/** Marketing can see leads for reporting and targeting, but cannot work them directly. */
+/** Some roles, such as Payment Follow-up, may view buyers but never work leads. */
 export function workableLead(user: SessionUser, leadId: number) {
   const lead = visibleLead(user, leadId);
-  if (user.role === 'marketing') throw new HttpError(403, 'Marketing has view-only access to individual leads.');
+  if (isViewOnly(user.role)) throw new HttpError(403, 'Your role can view this customer but not work the lead.');
   return lead;
 }
 
@@ -110,7 +119,7 @@ export function workableLead(user: SessionUser, leadId: number) {
 export const maskPhone = (phone: string) => (phone.length > 6 ? `${phone.slice(0, 5)}••••${phone.slice(-3)}` : '••••');
 
 export function phoneMasked(user: SessionUser) {
-  return getSetting<string[]>('mask_phone_roles', ['marketing']).includes(user.role);
+  return getSetting<string[]>('mask_phone_roles', []).includes(user.role);
 }
 
 export function presentLead<T extends { phone: string; labels?: string }>(user: SessionUser, lead: T) {

@@ -1,3 +1,4 @@
+import { isViewOnly } from '../../shared/domain.ts';
 import { randomBytes, createHash } from 'node:crypto';
 import { Router } from 'express';
 import QRCode from 'qrcode';
@@ -155,7 +156,7 @@ account.post('/google/disconnect', (req, res) => {
 
 account.post('/leads/:id/google-contact', async (req, res) => {
   const lead = visibleLead(req.user, Number(req.params.id));
-  if (req.user.role === 'marketing') throw new HttpError(403, 'Not available for your role.');
+  if (isViewOnly(req.user.role)) throw new HttpError(403, 'Not available for your role.');
   await saveContact(req.user.id, lead);
   logActivity(lead.id, 'note', 'Saved to Google Contacts', '', req.user.id);
   audit(req, 'google.contact', 'lead', lead.id);

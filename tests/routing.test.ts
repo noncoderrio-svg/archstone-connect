@@ -78,7 +78,7 @@ before(async () => {
   tele = await signIn('telecaller1@demo.archstone.test');
   teleId = (await call('GET', '/api/auth/me', tele)).data.user.id;
   t2 = db.get(`SELECT id FROM users WHERE email = 'telecaller2@demo.archstone.test'`).id;
-  s1 = db.get(`SELECT id FROM users WHERE role = 'sales' LIMIT 1`).id;
+  s1 = db.get(`SELECT id FROM users WHERE role = 'closing_manager' LIMIT 1`).id;
 });
 
 beforeEach(() => {

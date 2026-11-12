@@ -2,7 +2,7 @@ import { Columns3, CopyCheck, Download, MessageCircle, Plus, Rows3, Shuffle, Upl
 import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CountTabs, DatePill, FilterBar, FilterPill, MultiPill, RangePill, SearchBox, dateBounds, toOptions, useFilters } from '../components/Filters.tsx';
-import { BOARD_STAGES, DISPOSITIONS, SOURCES, STAGES } from '../../../shared/domain.ts';
+import { BOARD_STAGES, DISPOSITIONS, SOURCES, STAGES, isLeadRole } from '../../../shared/domain.ts';
 import { Page } from '../components/Layout.tsx';
 import {
   Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, Select, SelectField, Spinner, TempBadge, TextField, TextareaField, cx, useAction,
@@ -256,7 +256,7 @@ export default function Leads() {
   const results: Record<string, number> = data?.result_counts ?? {};
   const resultTabs = DISPOSITIONS.filter((d) => results[d] || f.disposition === d).map((d) => ({ value: d, label: d, count: results[d] ?? 0 }));
   const inTeam = (u: any) => !directory?.team_ids || directory.team_ids.includes(u.id);
-  const people = directory?.users.filter((u: any) => ['sales', 'telecaller', 'team_leader', 'site_head', 'sales_manager'].includes(u.role) && inTeam(u)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? [];
+  const people = directory?.users.filter((u: any) => isLeadRole(u.role) && inTeam(u)).map((u: any) => ({ value: String(u.id), label: u.name })) ?? [];
   const distribute = async () => {
     const r = await run(() => api.post('/leads/auto-distribute'));
     if (r) { alert(r.waiting ? `${r.assigned} assigned. ${r.waiting} are still waiting because no telecaller is available.` : `${r.assigned} leads assigned.`); void reload(); }
@@ -330,7 +330,7 @@ export default function Leads() {
           <span className="font-medium">{selected.length} selected</span>
           <Select aria-label="Assign to" className="w-52" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
             <option value="">Assign to…</option>
-            {directory?.users.filter((u: any) => ['sales', 'telecaller', 'team_leader'].includes(u.role) && inTeam(u)).map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            {directory?.users.filter((u: any) => isLeadRole(u.role) && inTeam(u)).map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </Select>
           <Button variant="primary" size="sm" busy={busy} disabled={!assignee} onClick={assign}>Assign</Button>
           <Button size="sm" busy={busy} onClick={assignToMe}>Assign to me</Button>

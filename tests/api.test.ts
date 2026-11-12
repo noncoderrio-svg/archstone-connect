@@ -96,10 +96,10 @@ before(async () => {
   users.admin = await signIn('owner@test.local');
   users.tele1 = await signIn('telecaller1@demo.archstone.test');
   users.tele2 = await signIn('telecaller2@demo.archstone.test');
-  users.sales1 = await signIn('sales1@demo.archstone.test');
-  users.sales2 = await signIn('sales2@demo.archstone.test');
+  users.sales1 = await signIn('closing1@demo.archstone.test');
+  users.sales2 = await signIn('closing2@demo.archstone.test');
   users.head = await signIn('sitehead@demo.archstone.test');
-  users.marketing = await signIn('marketing@demo.archstone.test');
+  users.payments = await signIn('payments@demo.archstone.test');
 });
 
 after(() => {
@@ -157,7 +157,7 @@ test('lower roles cannot use admin functions or export data', async () => {
 
 test('nobody can change their own role, and user lists never contain password data', async () => {
   const me = (await users.admin.get('/api/auth/me')).data.user;
-  const r = await users.admin.call('PUT', `/api/users/${me.id}`, { name: 'Owner', email: me.email, role: 'sales' });
+  const r = await users.admin.call('PUT', `/api/users/${me.id}`, { name: 'Owner', email: me.email, role: 'closing_manager' });
   assert.equal(r.status, 400);
   const list = await users.admin.get('/api/users');
   assert.ok(!JSON.stringify(list.data).includes('scrypt'));
@@ -170,10 +170,11 @@ test('a site head sees only leads on their own projects', async () => {
   assert.ok(data.leads.every((l: any) => ['Skyline Residences', 'Harbour Square'].includes(l.project_name)));
 });
 
-test('marketing sees masked phones and cannot work leads', async () => {
-  const { data } = await users.marketing.get('/api/leads');
-  assert.ok(data.leads[0].phone.includes('•'));
-  assert.equal((await users.marketing.post(`/api/leads/${data.leads[0].id}/note`, { body: 'x' })).status, 403);
+test('Payment Follow-up sees only buyers with a booking, and cannot work other leads', async () => {
+  const { data } = await users.payments.get('/api/leads');
+  assert.equal(data.leads.length, 0, 'no bookings yet, so no buyers to see');
+  const any = (await users.admin.get('/api/leads')).data.leads[0];
+  assert.equal((await users.payments.post(`/api/leads/${any.id}/note`, { body: 'x' })).status, 404);
   const csv = await users.admin.get('/api/leads/export');
   assert.ok(String(csv.data).includes('+9190000'));
 });
@@ -211,7 +212,7 @@ test('a telecaller hands a lead to sales with notes intact', async () => {
   const { data } = await users.tele1.get('/api/leads');
   const lead = data.leads.find((l: any) => l.stage === 'Not Contacted') ?? data.leads[0];
   const dir = (await users.tele1.get('/api/directory')).data.users;
-  const sales = dir.find((u: any) => u.role === 'sales');
+  const sales = dir.find((u: any) => u.role === 'closing_manager');
   const res = await users.tele1.post(`/api/leads/${lead.id}/handoff`, { sales_id: sales.id, notes: 'Keen on 2 BHK, call in evening' });
   assert.equal(res.status, 200);
   const after = (await users.admin.get(`/api/leads/${lead.id}`)).data;
@@ -281,9 +282,9 @@ test('campaign needs approval and a MahaRERA number, and skips ineligible contac
   const template = (await users.admin.get('/api/templates')).data.templates.find((t: any) => t.name === 'test_offer');
   const body = { name: 'Square offer', template_id: template.id, project_id: square.id, segment: {} };
 
-  const created = await users.marketing.post('/api/campaigns', body);
+  const created = await users.tele1.post('/api/campaigns', body);
   assert.equal(created.status, 201);
-  assert.equal((await users.marketing.post(`/api/campaigns/${created.data.id}/approve`, { approve: true })).status, 403);
+  assert.equal((await users.tele1.post(`/api/campaigns/${created.data.id}/approve`, { approve: true })).status, 403);
 
   const blocked = await users.admin.post(`/api/campaigns/${created.data.id}/approve`, { approve: true });
   assert.equal(blocked.status, 422);

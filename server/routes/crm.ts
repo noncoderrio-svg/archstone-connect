@@ -1,6 +1,6 @@
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { BUYER_FIELDS, DEFAULT_LABELS, DISPOSITIONS, SOURCES, STAGES } from '../../shared/domain.ts';
+import { BUYER_FIELDS, CLOSING_ROLES, DEFAULT_LABELS, DISPOSITIONS, SOURCES, STAGES, isManager, isViewOnly } from '../../shared/domain.ts';
 import { HttpError, assertCan, requirePermission, type SessionUser } from '../auth.ts';
 import { all, get, getSetting, minutesFromNow, nowIso, run, setSetting, tx } from '../db.ts';
 import { audit, broadcast, leadScope, maskPhone, normalizePhone, phoneMasked, presentLead, visibleLead, workableLead } from '../services/core.ts';
@@ -35,11 +35,11 @@ const leadFields = z.object({
   wa_opt_in_source: z.string().max(120).optional(),
 });
 
-/** Team Leaders, and anyone leading a team below company level, assign only within that team. */
+/** Sourcing and Closing Managers, and anyone leading a team below company level, assign only within that team. */
 function allowedAssignees(user: SessionUser) {
   if (user.role === 'admin') return null;
   const reports = teamOf(user.id);
-  return reports.length || user.role === 'team_leader' ? [user.id, ...reports] : null;
+  return reports.length || user.role === 'sourcing_manager' || user.role === 'closing_manager' ? [user.id, ...reports] : null;
 }
 
 // ---------- List ----------
@@ -132,7 +132,7 @@ crm.get('/leads/export', requirePermission('lead.export'), (req, res) => {
 crm.post('/leads', async (req, res) => {
   assertCan(req.user, 'lead.create');
   const input = leadFields.parse(req.body);
-  const assignSelf = ['sales', 'telecaller'].includes(req.user.role);
+  const assignSelf = ['closing_manager', 'telecaller'].includes(req.user.role);
   const result = ingestLead(
     {
       ...input,
@@ -204,7 +204,7 @@ crm.get('/leads/:id', (req, res) => {
        FROM calls c JOIN users u ON u.id = c.user_id WHERE c.lead_id = ? ORDER BY c.id DESC LIMIT 20`,
       lead.id,
     ),
-    documents: req.user.role === 'marketing' ? [] : all(
+    documents: isViewOnly(req.user.role) ? [] : all(
       `SELECT d.id, d.type, d.filename, d.size, d.status, d.drive_file_id != '' AS in_drive, d.created_at, u.name AS uploaded_by_name
        FROM documents d LEFT JOIN users u ON u.id = d.uploaded_by WHERE d.lead_id = ? ORDER BY d.id DESC`,
       lead.id,
@@ -213,7 +213,7 @@ crm.get('/leads/:id', (req, res) => {
     timeline: all(
       `SELECT a.id, a.type, a.title, a.body, a.created_at, u.name AS actor FROM activities a LEFT JOIN users u ON u.id = a.actor_id
        WHERE a.lead_id = ? AND (a.type != 'manager_note' OR ?) ORDER BY a.id DESC LIMIT 200`,
-      lead.id, ['admin', 'sales_manager', 'site_head', 'team_leader'].includes(req.user.role) ? 1 : 0,
+      lead.id, isManager(req.user.role) ? 1 : 0,
     ),
     tasks: all(
       `SELECT t.*, u.name AS owner_name FROM tasks t JOIN users u ON u.id = t.owner_id WHERE t.lead_id = ? ORDER BY t.completed_at IS NOT NULL, t.due_at`,
@@ -262,11 +262,9 @@ crm.patch('/leads/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-const LEADERS = ['admin', 'sales_manager', 'site_head', 'team_leader'];
-
 /** A note for managers only. Agents, their AI summaries and the lead list never see it. */
 crm.post('/leads/:id/manager-note', (req, res) => {
-  if (!LEADERS.includes(req.user.role)) throw new HttpError(403, 'Only managers can add this note.');
+  if (!isManager(req.user.role)) throw new HttpError(403, 'Only managers can add this note.');
   const lead = visibleLead(req.user, id(req.params.id));
   const { body } = z.object({ body: z.string().trim().min(1).max(1000) }).parse(req.body);
   run(`INSERT INTO activities(lead_id, type, title, body, actor_id) VALUES(?, 'manager_note', 'Manager note', ?, ?)`, lead.id, body, req.user.id);
@@ -325,11 +323,11 @@ crm.post('/leads/:id/note', (req, res) => {
 
 crm.post('/leads/:id/handoff', (req, res) => {
   const lead = workableLead(req.user, id(req.params.id));
-  const body = z.object({ sales_id: z.number().int(), notes: z.string().trim().min(5, 'Add a short note for the sales person.').max(1000) }).parse(req.body);
+  const body = z.object({ sales_id: z.number().int(), notes: z.string().trim().min(5, 'Add a short note for the closing manager.').max(1000) }).parse(req.body);
   const target = get<any>(`SELECT id, role FROM users WHERE id = ? AND status = 'active'`, body.sales_id);
-  if (!target || target.role !== 'sales') throw new HttpError(400, 'Choose an active sales person.');
+  if (!target || !(CLOSING_ROLES as readonly string[]).includes(target.role)) throw new HttpError(400, 'Choose an active closing manager.');
   if (req.user.role === 'telecaller' && lead.owner_id !== req.user.id) throw new HttpError(403, 'This lead is not assigned to you.');
-  if (!['telecaller', 'team_leader', 'site_head', 'sales_manager', 'admin'].includes(req.user.role)) throw new HttpError(403, 'You cannot hand off leads.');
+  if (req.user.role !== 'telecaller' && !isManager(req.user.role)) throw new HttpError(403, 'You cannot hand off leads.');
   tx(() => {
     run('UPDATE leads SET presales_id = COALESCE(presales_id, ?) WHERE id = ?', lead.owner_id, lead.id);
     assignLead(lead.id, target.id, req.user.id, body.notes);
@@ -480,7 +478,7 @@ crm.post('/leads/:id/tasks', (req, res) => {
 // ---------- Follow-ups ----------
 const followUpScope = (req: Request) => {
   const scope = leadScope(req.user);
-  const mine = ['sales', 'telecaller'].includes(req.user.role);
+  const mine = !isManager(req.user.role);
   return { sql: `${scope.sql} AND l.deleted_at IS NULL${mine ? ' AND t.owner_id = ?' : ''}`, params: [...scope.params, ...(mine ? [req.user.id] : [])] };
 };
 

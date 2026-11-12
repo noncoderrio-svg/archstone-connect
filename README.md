@@ -18,11 +18,13 @@ These are the starting points. An admin can change any of them under **Team → 
 | Role | Sees | Can do |
 | --- | --- | --- |
 | Admin | Everything | Everything, always |
-| Sales Manager | All leads | Reassign leads, approve bookings, view reports, manage files |
 | Site Head | Their own projects | Manage units, approve bookings, run check-ins, manage files |
-| Marketing | All leads, phones hidden | Templates, broadcasts, imports, reports, files |
-| Sales Person | Their own leads | Work leads, send broadcasts to their leads, hold units |
-| Pre-Sales Telecaller | Their own leads | Call, qualify, send broadcasts to their leads, hand off to sales |
+| Sourcing Manager | Their own and their team's leads, and their channel partners' leads | Manage channel partners, reassign leads, approve bookings, import calling lists, view reports |
+| Closing Manager | Their own and their team's leads | Work and close leads, manage telecallers, approve discounts, view reports |
+| Payment Follow-up | Buyers with a booking on their projects, view only | Record payments received, log payment follow-ups |
+| Telecaller | Their own leads | Call, qualify, send broadcasts to their leads, hand off to a closing manager |
+
+Older roles were moved once, when this version first started: Sales Manager became Sourcing Manager, Sales Person and Team Leader became Closing Manager, and Marketing became Telecaller. Saved role permissions moved with them; where two old roles became one, the new role kept everything either had.
 
 Rules are enforced on the server, so changing a link or calling the API directly does not bypass them.
 
@@ -118,7 +120,7 @@ Meta form answers about home size and budget fill the lead's requirement automat
 
 In **Team → Structure**, see everyone's reporting line. Edit a person and set **Reports to**.
 
-Until reporting lines are set, access works by role. Once someone has a team, they see their own leads and those of everyone below them, at every level. Admins always see everything. Team Leaders see only their team. Overdue alerts go to the direct manager, then up one level each time the wait passes. Approvals go to the nearest manager who may approve them, and Team Leaders assign leads only within their team.
+Until reporting lines are set, access works by role. Once someone has a team, they see their own leads and those of everyone below them, at every level. Admins always see everything. Sourcing and Closing Managers see only their team. Overdue alerts go to the direct manager, then up one level each time the wait passes. Approvals go to the nearest manager who may approve them, and Sourcing and Closing Managers assign leads only within their team.
 
 ## Agent performance
 
