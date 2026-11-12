@@ -388,13 +388,13 @@ export function Layout() {
             <nav className="frost grid auto-cols-fr grid-flow-col gap-1 rounded-[1.4rem] p-1.5 shadow-[0_10px_30px_-12px_rgb(0_0_0/0.35)] ring-1 ring-line" aria-label="Quick">
               {items.filter((i) => i.mobile).map((i) => (
                 <NavLink key={i.to} to={i.to} end={i.to === '/'} className={({ isActive }) => cx(
-                  'flex h-12 min-w-0 items-center justify-center gap-1.5 rounded-2xl px-2 text-[12px] transition-colors',
-                  isActive ? 'bg-brand font-semibold text-white shadow-sm dark:text-slate-950' : 'flex-col gap-0.5 text-muted hover:text-ink',
+                  'flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[10.5px] transition-colors',
+                  isActive ? 'bg-brand font-semibold text-white shadow-sm dark:text-slate-950' : 'text-muted hover:text-ink',
                 )}>
                   {({ isActive }) => (
                     <>
                       <span className="shrink-0">{i.icon}</span>
-                      <span className={cx('truncate', !isActive && 'text-[10.5px]')}>{i.label.replace('WhatsApp ', '').replace('Site ', '')}</span>
+                      <span className="max-w-full truncate">{i.label.replace('WhatsApp ', '').replace('Site ', '')}</span>
                     </>
                   )}
                 </NavLink>
