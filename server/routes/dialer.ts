@@ -4,7 +4,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { HttpError, requirePermission } from '../auth.ts';
 import { all, get, getSetting, minutesFromNow, nowIso, run, tx } from '../db.ts';
+import { LEAD_ROLES } from '../../shared/domain.ts';
 import { audit, broadcast, leadScope, normalizePhone, notify, presentLead, workableLead } from '../services/core.ts';
+import { teamOf } from '../services/hierarchy.ts';
 import { ingestLead, logActivity, markResponded } from '../services/leads.ts';
 
 export const dialer = Router();
@@ -85,8 +87,42 @@ dialer.get('/dialer/lists', (req, res) => {
 });
 
 /**
- * Cleans an uploaded file, then shares it out equally. Repeats and bad numbers
- * are removed and counted. Numbers already in the CRM keep their current owner.
+ * Hands out numbers in turn. People with a count get numbers until their count is reached;
+ * anything beyond the counts, or everything when no counts are given, is shared equally.
+ */
+export function splitter(people: number[], counts: Record<string, number> = {}) {
+  const left = new Map(people.map((id) => [id, Math.max(0, Math.floor(counts[id] ?? 0))]));
+  let counted = 0;
+  let equal = 0;
+  return () => {
+    const withCount = people.filter((id) => left.get(id)! > 0);
+    if (withCount.length) {
+      const id = withCount[counted++ % withCount.length];
+      left.set(id, left.get(id)! - 1);
+      return id;
+    }
+    return people[equal++ % people.length];
+  };
+}
+
+const activeCallers = (ids: number[]) => {
+  const roles = LEAD_ROLES.map((r) => `'${r}'`).join(',');
+  return ids.filter((id) => get(`SELECT 1 AS x FROM users WHERE id = ? AND status = 'active' AND role IN (${roles})`, id));
+};
+
+/** Who a manager may move leads to, by the same rule as reassigning leads: their own team when they lead one. */
+function assignablePeople(user: import('../auth.ts').SessionUser, ids: number[]) {
+  const active = activeCallers(ids);
+  if (user.role === 'admin' || user.role === 'site_head') return active;
+  const team = teamOf(user.id);
+  const limited = team.length || user.role === 'sourcing_manager' || user.role === 'closing_manager';
+  return limited ? active.filter((id) => id === user.id || team.includes(id)) : active;
+}
+
+/**
+ * Cleans an uploaded file, then shares it out by the counts typed in, and equally after that.
+ * Repeats and bad numbers are removed and counted. Numbers already in the CRM keep their current owner.
+ * Each person is told once about their share, not once per number.
  */
 dialer.post('/dialer/lists', requirePermission('lead.import'), (req, res) => {
   const b = z.object({
@@ -95,14 +131,15 @@ dialer.post('/dialer/lists', requirePermission('lead.import'), (req, res) => {
     agent_ids: z.array(z.number().int()).min(1, 'Choose at least one person.').max(100),
     rows: z.array(z.record(z.string(), z.string())).min(1).max(10000),
     consent_source: z.string().trim().max(120).optional(),
+    counts: z.record(z.string(), z.number().int().min(0).max(10000)).optional(),
   }).parse(req.body);
-  const agents = b.agent_ids.filter((id) => get(`SELECT 1 AS x FROM users WHERE id = ? AND status = 'active'`, id));
-  if (!agents.length) throw new HttpError(400, 'Choose at least one active person.');
+  const agents = [...new Set(activeCallers(b.agent_ids))];
+  if (!agents.length) throw new HttpError(400, 'Choose at least one active person who works leads.');
+  const next = splitter(agents, b.counts);
 
   const report = { added: 0, repeated_in_file: 0, already_in_crm: 0, invalid: 0, per_agent: {} as Record<string, number> };
   const seen = new Set<string>();
   const list = run('INSERT INTO call_lists(name, project_id, created_by) VALUES(?, ?, ?)', b.name, b.project_id ?? null, req.user.id);
-  let turn = 0;
   tx(() => {
     for (const row of b.rows) {
       let phone: string;
@@ -115,7 +152,7 @@ dialer.post('/dialer/lists', requirePermission('lead.import'), (req, res) => {
       if (seen.has(phone)) { report.repeated_in_file++; continue; }
       seen.add(phone);
       if (get('SELECT 1 AS x FROM leads WHERE phone = ?', phone)) { report.already_in_crm++; continue; }
-      const owner = agents[turn++ % agents.length];
+      const owner = next();
       const budget = Number(row.budget_lakhs);
       const r = ingestLead({
         name: row.name?.trim() || 'Cold list contact',
@@ -129,7 +166,7 @@ dialer.post('/dialer/lists', requirePermission('lead.import'), (req, res) => {
         owner_id: owner,
         wa_opt_in: Boolean(b.consent_source),
         wa_opt_in_source: b.consent_source,
-      }, req.user.id);
+      }, req.user.id, { quiet: true });
       run('UPDATE leads SET call_list_id = ?, presales_id = ? WHERE id = ?', list.id, owner, r.id);
       report.added++;
       report.per_agent[owner] = (report.per_agent[owner] ?? 0) + 1;
@@ -139,4 +176,77 @@ dialer.post('/dialer/lists', requirePermission('lead.import'), (req, res) => {
   audit(req, 'calllist.create', 'call_list', list.id, `${report.added} added, ${report.invalid} invalid, ${report.repeated_in_file} repeated`);
   broadcast('leads');
   res.status(201).json({ id: list.id, ...report });
+});
+
+// ---------- Re-splitting a list ----------
+/** A number nobody has called yet: no call logged on the lead, and no call placed. */
+const UNCALLED = `NOT EXISTS (SELECT 1 FROM activities a WHERE a.lead_id = l.id AND a.type = 'call') AND NOT EXISTS (SELECT 1 FROM calls c WHERE c.lead_id = l.id)`;
+
+function visibleList(user: import('../auth.ts').SessionUser, id: number) {
+  const list = get<any>('SELECT * FROM call_lists WHERE id = ?', id);
+  const scope = leadScope(user);
+  if (!list || !get(`SELECT 1 AS x FROM leads l WHERE l.call_list_id = ? AND ${scope.sql} LIMIT 1`, id, ...scope.params)) throw new HttpError(404, 'List not found.');
+  return list;
+}
+
+/** Who holds this list's numbers, and how many each has not called yet. */
+dialer.get('/dialer/lists/:id/people', requirePermission('lead.reassign'), (req, res) => {
+  const list = visibleList(req.user, Number(req.params.id));
+  const scope = leadScope(req.user);
+  res.json({
+    people: all(
+      `SELECT u.id, u.name, u.role, COUNT(*) AS total, SUM(${UNCALLED}) AS uncalled
+       FROM leads l JOIN users u ON u.id = l.owner_id
+       WHERE l.call_list_id = ? AND ${scope.sql} GROUP BY u.id ORDER BY u.name`,
+      list.id, ...scope.params,
+    ),
+  });
+});
+
+/**
+ * Moves numbers nobody has called yet from some people to others, in one step, equally or by count.
+ * Numbers already called stay with whoever called them. Each person is told once.
+ */
+dialer.post('/dialer/lists/:id/resplit', requirePermission('lead.reassign'), (req, res) => {
+  const list = visibleList(req.user, Number(req.params.id));
+  const b = z.object({
+    from_ids: z.array(z.number().int()).min(1, 'Choose whose numbers to move.').max(100),
+    to_ids: z.array(z.number().int()).min(1, 'Choose who gets them.').max(100),
+    mode: z.enum(['equal', 'count']).default('equal'),
+    counts: z.record(z.string(), z.number().int().min(0).max(10000)).optional(),
+  }).parse(req.body);
+  const targets = [...new Set(assignablePeople(req.user, b.to_ids))];
+  if (!targets.length || targets.length !== new Set(b.to_ids).size) throw new HttpError(400, 'Choose active people you may assign leads to.');
+  const scope = leadScope(req.user);
+  const marks = b.from_ids.map(() => '?').join(',');
+  const movable = all<{ id: number; owner_id: number }>(
+    `SELECT l.id, l.owner_id FROM leads l WHERE l.call_list_id = ? AND l.owner_id IN (${marks}) AND ${UNCALLED} AND ${scope.sql} ORDER BY l.id`,
+    list.id, ...b.from_ids, ...scope.params,
+  );
+  if (b.mode === 'count' && !Object.values(b.counts ?? {}).some((n) => n > 0)) throw new HttpError(400, 'Type how many numbers each person gets.');
+
+  // By count: each person gets up to their number and the rest stay where they are. Equally: everything is shared.
+  const quota = new Map(targets.map((id) => [id, b.mode === 'count' ? Math.max(0, b.counts?.[id] ?? 0) : Infinity]));
+  let turn = 0;
+  const gained = new Map<number, number>();
+  const lost = new Map<number, number>();
+  const names = new Map(all<{ id: number; name: string }>(`SELECT id, name FROM users WHERE id IN (${targets.map(() => '?').join(',')})`, ...targets).map((u) => [u.id, u.name]));
+  tx(() => {
+    for (const lead of movable) {
+      const open = targets.filter((id) => quota.get(id)! > 0 && id !== lead.owner_id);
+      if (!open.length) continue;
+      const to = open[turn++ % open.length];
+      quota.set(to, quota.get(to)! - 1);
+      run('UPDATE leads SET owner_id = ?, presales_id = ?, updated_at = ? WHERE id = ?', to, to, nowIso(), lead.id);
+      run(`INSERT INTO activities(lead_id, type, title, body, actor_id) VALUES(?, 'assign', ?, 'Calling list re-split', ?)`, lead.id, `Assigned to ${names.get(to)}`, req.user.id);
+      gained.set(to, (gained.get(to) ?? 0) + 1);
+      lost.set(lead.owner_id, (lost.get(lead.owner_id) ?? 0) + 1);
+    }
+  });
+  const moved = [...gained.values()].reduce((s, n) => s + n, 0);
+  for (const [id, n] of gained) notify(id, 'Calling list re-split', `${list.name}: ${n} more number${n > 1 ? 's' : ''} for you`, '/dial');
+  for (const [id, n] of lost) if (!gained.has(id)) notify(id, 'Calling list re-split', `${list.name}: ${n} number${n > 1 ? 's' : ''} moved to colleagues`, '/dial', { push: false });
+  audit(req, 'calllist.resplit', 'call_list', list.id, `${moved} moved from ${b.from_ids.join(',')} to ${targets.join(',')} (${b.mode})`);
+  broadcast('leads');
+  res.json({ moved, left: movable.length - moved, per_person: Object.fromEntries(gained) });
 });

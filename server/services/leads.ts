@@ -90,7 +90,8 @@ export type IngestResult = { id: number; duplicate: boolean; created: boolean };
  * The one way leads enter the system: website, ads, WhatsApp, imports and
  * manual entry all pass through here, so de-duplication and routing are uniform.
  */
-export function ingestLead(input: LeadInput, actorId: number | null = null): IngestResult {
+/** `quiet` skips the per-lead "new lead" alert, for bulk files where each person is told once instead. */
+export function ingestLead(input: LeadInput, actorId: number | null = null, options: { quiet?: boolean } = {}): IngestResult {
   const phone = normalizePhone(input.phone);
   const result = tx(() => {
     const match = get<any>('SELECT id, owner_id, presales_id, deleted_at, merged_into FROM leads WHERE phone = ?', phone);
@@ -128,10 +129,12 @@ export function ingestLead(input: LeadInput, actorId: number | null = null): Ing
     logActivity(id, 'created', `Lead created from ${input.source}`, input.notes ?? '', actorId);
     if (route && routed) logActivity(id, 'assign', `Assigned by mapping: ${route.name}`, '', actorId);
     rescore(id);
-    alertUser(ownerId, 'new_lead', 'New lead assigned', `${input.name} · ${input.source}`, `/leads/${id}`, {
-      template: 'staff_new_lead', vars: { lead: input.name.trim(), source: input.source },
-    });
-    broadcast('leads');
+    if (!options.quiet) {
+      alertUser(ownerId, 'new_lead', 'New lead assigned', `${input.name} · ${input.source}`, `/leads/${id}`, {
+        template: 'staff_new_lead', vars: { lead: input.name.trim(), source: input.source },
+      });
+      broadcast('leads');
+    }
     return { id, duplicate: false, created: true };
   });
   if (result.created) void runWorkflows('lead_created', result.id).catch(() => undefined);

@@ -1,4 +1,4 @@
-import { ArrowLeft, Mail, MessageCircle, MessageSquareText, Phone, PhoneForwarded, Upload } from 'lucide-react';
+import { ArrowLeft, Mail, MessageCircle, MessageSquareText, Phone, PhoneForwarded, Shuffle, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DISPOSITIONS, isLeadRole } from '../../../shared/domain.ts';
@@ -15,6 +15,7 @@ function NewListModal({ onClose }: { onClose: () => void }) {
   const { data: projects } = useApi('/projects');
   const [f, setF] = useState({ name: '', project_id: '', consent: '' });
   const [agents, setAgents] = useState<number[]>([]);
+  const [counts, setCounts] = useState<Record<number, string>>({});
   const [rows, setRows] = useState<Record<string, string>[]>([]);
   const [fileError, setFileError] = useState('');
   const [report, setReport] = useState<any>(null);
@@ -35,10 +36,13 @@ function NewListModal({ onClose }: { onClose: () => void }) {
   const submit = async () => {
     const r = await run(() => api.post('/dialer/lists', {
       name: f.name, project_id: f.project_id ? Number(f.project_id) : null, agent_ids: agents, rows, consent_source: f.consent || undefined,
+      counts: Object.fromEntries(agents.filter((a) => Number(counts[a]) > 0).map((a) => [a, Number(counts[a])])),
     }));
     if (r) setReport(r);
   };
 
+  const callers = people?.users.filter((u: any) => isLeadRole(u.role)) ?? [];
+  const typed = agents.reduce((s, a) => s + (Number(counts[a]) || 0), 0);
   if (report) {
     return (
       <Modal title="List ready" onClose={onClose}>
@@ -48,11 +52,17 @@ function NewListModal({ onClose }: { onClose: () => void }) {
           <li><b className="text-ink">{report.already_in_crm}</b> already in the CRM, left with their current owner</li>
           <li><b className="text-ink">{report.invalid}</b> invalid numbers removed</li>
         </ul>
+        {!!Object.keys(report.per_agent).length && (
+          <ul className="mt-3 divide-y divide-line rounded-xl border border-line text-sm">
+            {Object.entries(report.per_agent).map(([id, n]) => (
+              <li key={id} className="flex justify-between px-3 py-1.5"><span>{callers.find((u: any) => String(u.id) === id)?.name ?? 'Someone'}</span><b className="tabular-nums text-ink">{String(n)}</b></li>
+            ))}
+          </ul>
+        )}
         <div className="mt-3 flex justify-end"><Button variant="primary" onClick={onClose}>Done</Button></div>
       </Modal>
     );
   }
-  const callers = people?.users.filter((u: any) => isLeadRole(u.role)) ?? [];
   return (
     <Modal title="New calling list" onClose={onClose}>
       <div className="space-y-3">
@@ -66,14 +76,27 @@ function NewListModal({ onClose }: { onClose: () => void }) {
         {fileError && <ErrorNote>{fileError}</ErrorNote>}
         {!!rows.length && <p className="text-sm text-ink">{rows.length} rows ready.</p>}
         <fieldset>
-          <legend className="mb-1 text-[13px] font-medium">Share equally between</legend>
-          <div className="grid grid-cols-2 gap-1">
-            {callers.map((u: any) => (
-              <label key={u.id} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" className="accent-[#C85A1E]" checked={agents.includes(u.id)} onChange={(e) => setAgents(e.target.checked ? [...agents, u.id] : agents.filter((a) => a !== u.id))} />{u.name}
-              </label>
-            ))}
+          <legend className="mb-1 text-[13px] font-medium">Who gets these numbers</legend>
+          <p className="mb-2 text-xs text-muted">Type how many each person gets, or leave it empty. Anything beyond the counts is shared equally.</p>
+          <div className="scroll-thin max-h-60 space-y-1 overflow-y-auto">
+            {callers.map((u: any) => {
+              const on = agents.includes(u.id);
+              return (
+                <div key={u.id} className="flex items-center gap-2 text-sm">
+                  <label className="flex min-w-0 flex-1 items-center gap-2">
+                    <input type="checkbox" className="accent-[var(--brand)]" checked={on} onChange={(e) => setAgents(e.target.checked ? [...agents, u.id] : agents.filter((a) => a !== u.id))} />
+                    <span className="truncate">{u.name}</span>
+                  </label>
+                  <input type="number" min="0" inputMode="numeric" aria-label={`How many numbers for ${u.name}`} placeholder="Equal share" disabled={!on}
+                    className="h-8 w-28 rounded-lg border border-line bg-surface px-2 text-right text-sm tabular-nums disabled:opacity-40"
+                    value={counts[u.id] ?? ''} onChange={(e) => setCounts({ ...counts, [u.id]: e.target.value })} />
+                </div>
+              );
+            })}
           </div>
+          {!!rows.length && !!agents.length && (
+            <p className="mt-2 text-xs text-muted">{typed ? `${Math.min(typed, rows.length)} by count, about ${Math.max(0, rows.length - typed)} shared equally (before repeats and invalid numbers are removed).` : `About ${Math.ceil(rows.length / agents.length)} each.`}</p>
+          )}
         </fieldset>
         <TextField label="WhatsApp consent source (optional)" hint="Fill this in only if these people agreed to WhatsApp messages." value={f.consent} onChange={(e) => setF({ ...f, consent: e.target.value })} />
         <div className="flex justify-end gap-2">
@@ -81,6 +104,87 @@ function NewListModal({ onClose }: { onClose: () => void }) {
           <Button variant="primary" busy={busy} disabled={!rows.length || !agents.length || f.name.trim().length < 2} onClick={submit}>Create list</Button>
         </div>
       </div>
+    </Modal>
+  );
+}
+
+function ResplitModal({ list, onClose }: { list: any; onClose: () => void }) {
+  const { data } = useApi(`/dialer/lists/${list.id}/people`);
+  const { data: people } = useApi('/directory');
+  const [from, setFrom] = useState<number[]>([]);
+  const [to, setTo] = useState<number[]>([]);
+  const [mode, setMode] = useState<'equal' | 'count'>('equal');
+  const [counts, setCounts] = useState<Record<number, string>>({});
+  const [result, setResult] = useState<any>(null);
+  const { busy, run } = useAction();
+  const holders = data?.people ?? [];
+  // Same rule as reassigning leads: a manager with a team moves numbers only within it.
+  const callers = (people?.users ?? []).filter((u: any) => isLeadRole(u.role) && (!people?.team_ids || people.team_ids.includes(u.id)));
+  const available = holders.filter((p: any) => from.includes(p.id)).reduce((s: number, p: any) => s + p.uncalled, 0);
+  const toggle = (set: number[], id: number, fn: (v: number[]) => void) => fn(set.includes(id) ? set.filter((x) => x !== id) : [...set, id]);
+  const submit = async () => {
+    const r = await run(() => api.post(`/dialer/lists/${list.id}/resplit`, {
+      from_ids: from, to_ids: to, mode,
+      counts: mode === 'count' ? Object.fromEntries(to.map((id) => [id, Number(counts[id]) || 0])) : undefined,
+    }));
+    if (r) setResult(r);
+  };
+  if (result) {
+    return (
+      <Modal title="Numbers moved" onClose={onClose}>
+        <p className="text-sm text-ink"><b>{result.moved}</b> uncalled numbers moved.{result.left ? ` ${result.left} stayed where they were.` : ''} Each person has been told once.</p>
+        <div className="mt-3 flex justify-end"><Button variant="primary" onClick={onClose}>Done</Button></div>
+      </Modal>
+    );
+  }
+  return (
+    <Modal title={`Re-split: ${list.name}`} onClose={onClose} wide>
+      {!data ? <Spinner /> : (
+        <div className="space-y-4">
+          <p className="text-[13px] text-muted">Only numbers nobody has called yet are moved. Numbers already called stay with their caller.</p>
+          <fieldset>
+            <legend className="mb-1 text-[13px] font-medium">Take uncalled numbers from</legend>
+            <ul className="divide-y divide-line rounded-xl border border-line">
+              {holders.map((p: any) => (
+                <li key={p.id}>
+                  <label className="flex items-center gap-2 px-3 py-2 text-sm">
+                    <input type="checkbox" className="accent-[var(--brand)]" checked={from.includes(p.id)} disabled={!p.uncalled} onChange={() => toggle(from, p.id, setFrom)} />
+                    <span className="flex-1">{p.name}</span>
+                    <span className="text-xs text-muted tabular-nums">{p.uncalled} uncalled of {p.total}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+          <fieldset>
+            <legend className="mb-1 text-[13px] font-medium">Give them to</legend>
+            <div className="mb-2 flex gap-4 text-sm">
+              <label className="flex items-center gap-1.5"><input type="radio" name="mode" className="accent-[var(--brand)]" checked={mode === 'equal'} onChange={() => setMode('equal')} />Share equally</label>
+              <label className="flex items-center gap-1.5"><input type="radio" name="mode" className="accent-[var(--brand)]" checked={mode === 'count'} onChange={() => setMode('count')} />By count</label>
+            </div>
+            <div className="scroll-thin max-h-56 space-y-1 overflow-y-auto">
+              {callers.map((u: any) => (
+                <div key={u.id} className="flex items-center gap-2 text-sm">
+                  <label className="flex min-w-0 flex-1 items-center gap-2">
+                    <input type="checkbox" className="accent-[var(--brand)]" checked={to.includes(u.id)} onChange={() => toggle(to, u.id, setTo)} />
+                    <span className="truncate">{u.name}</span>
+                  </label>
+                  {mode === 'count' && (
+                    <input type="number" min="0" inputMode="numeric" aria-label={`How many for ${u.name}`} disabled={!to.includes(u.id)}
+                      className="h-8 w-24 rounded-lg border border-line bg-surface px-2 text-right text-sm tabular-nums disabled:opacity-40"
+                      value={counts[u.id] ?? ''} onChange={(e) => setCounts({ ...counts, [u.id]: e.target.value })} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </fieldset>
+          <p className="text-sm text-ink">{available} uncalled number{available === 1 ? '' : 's'} selected{mode === 'equal' && to.length ? `, about ${Math.ceil(available / to.length)} each` : ''}.</p>
+          <div className="flex justify-end gap-2">
+            <Button onClick={onClose}>Cancel</Button>
+            <Button variant="primary" busy={busy} disabled={!from.length || !to.length || !available} onClick={submit}>Move numbers</Button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
@@ -197,6 +301,7 @@ export default function Dialer() {
   const { data, error, loading, reload } = useApi('/dialer/lists', ['leads']);
   const [active, setActive] = useState<{ list: number | null } | null>(null);
   const [creating, setCreating] = useState(false);
+  const [resplitting, setResplitting] = useState<any>(null);
   const { f, set, clear, activeCount } = useFilters(['q', 'project', 'progress', 'sort'] as const);
   if (active) return <Page><Session list={active.list} onExit={() => { setActive(null); void reload(); }} /></Page>;
   const lists = filterRows<any>(data?.lists, f, {
@@ -229,11 +334,15 @@ export default function Dialer() {
             <p className="text-[13px] text-muted">{l.project_name ?? 'No project'} · {l.total} contacts</p>
             <div className="mt-2 h-2 rounded-full bg-surface-2"><div className="h-full rounded-full bg-brand" style={{ width: `${l.total ? ((l.total - l.untouched) / l.total) * 100 : 0}%` }} /></div>
             <p className="mt-1 text-[13px]">{l.total - l.untouched} worked · {l.interested} interested</p>
-            <Button size="sm" className="mt-2" onClick={() => setActive({ list: l.id })}><Phone size={14} />Call this list</Button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setActive({ list: l.id })}><Phone size={14} />Call this list</Button>
+              {can('lead.reassign') && <Button size="sm" onClick={() => setResplitting(l)}><Shuffle size={14} />Re-split</Button>}
+            </div>
           </Card>
         ))}
       </div>
       {creating && <NewListModal onClose={() => { setCreating(false); void reload(); }} />}
+      {resplitting && <ResplitModal list={resplitting} onClose={() => { setResplitting(null); void reload(); }} />}
     </Page>
   );
 }
