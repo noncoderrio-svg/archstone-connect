@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { isLeadRole } from '../../../shared/domain.ts';
 import { FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
+import { ConfirmErase, EraseButton } from '../components/Erase.tsx';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Modal, PageHeader, SelectField, Spinner, Stat, TextField, TextareaField, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -154,7 +155,7 @@ function MoveModal({ partner, managers, onClose }: { partner: any; managers: any
   );
 }
 
-function PartnerRow({ p, onContact, onLead, onEdit, onMove }: { p: any; onContact: () => void; onLead: () => void; onEdit: () => void; onMove?: () => void }) {
+function PartnerRow({ p, onContact, onLead, onEdit, onMove, onDelete }: { p: any; onContact: () => void; onLead: () => void; onEdit: () => void; onMove?: () => void; onDelete?: () => void }) {
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
       <div className="min-w-48 flex-1">
@@ -181,6 +182,7 @@ function PartnerRow({ p, onContact, onLead, onEdit, onMove }: { p: any; onContac
         <Button size="sm" disabled={p.status !== 'active'} onClick={onLead}><UserPlus size={14} />Add lead</Button>
         <Button size="sm" onClick={onEdit}>Edit</Button>
         {onMove && <Button size="sm" onClick={onMove}>Move</Button>}
+        {onDelete && <EraseButton label="Delete" onClick={onDelete} />}
       </span>
     </li>
   );
@@ -193,7 +195,9 @@ export default function Partners() {
   const [registering, setRegistering] = useState<any>(null);
   const [contacting, setContacting] = useState<any>(null);
   const [moving, setMoving] = useState<any>(null);
+  const [deleting, setDeleting] = useState<any>(null);
   const { run } = useAction();
+  const startDelete = async (p: any) => { const preview = await run(() => api.get(`/erase/partners/${p.id}`)); if (preview) setDeleting(preview); };
   const { f, set, clear, activeCount } = useFilters(['q', 'status', 'firm', 'area', 'manager', 'commission', 'sort'] as const);
   if (loading) return <Spinner />;
   if (error || !data) return <Page><ErrorNote>{error}</ErrorNote></Page>;
@@ -211,7 +215,7 @@ export default function Partners() {
   const done = (fn: (v: any) => void) => () => { fn(null); void reload(); };
   const monthValue = data.month_bookings.reduce((s: number, b: any) => s + b.amount_lakhs, 0);
   const row = (p: any) => (
-    <PartnerRow key={p.id} p={p} onContact={() => setContacting(p)} onLead={() => setRegistering(p)} onEdit={() => setEditing(p)} onMove={data.can_move ? () => setMoving(p) : undefined} />
+    <PartnerRow key={p.id} p={p} onContact={() => setContacting(p)} onLead={() => setRegistering(p)} onEdit={() => setEditing(p)} onMove={data.can_move ? () => setMoving(p) : undefined} onDelete={user!.role === 'admin' ? () => startDelete(p) : undefined} />
   );
 
   return (
@@ -327,6 +331,16 @@ export default function Partners() {
       {registering && <RegisterLeadModal partner={registering} onClose={done(setRegistering)} />}
       {contacting && <ContactModal partner={contacting} kinds={data.kinds} today={data.today} onClose={done(setContacting)} />}
       {moving && <MoveModal partner={moving} managers={data.managers} onClose={done(setMoving)} />}
+      {deleting && (
+        <ConfirmErase title={`Delete ${deleting.partner.name}`} onClose={() => setDeleting(null)} onDone={done(setDeleting)}
+          action={() => api.post(`/erase/partners/${deleting.partner.id}`)}>
+          <ul className="list-disc space-y-0.5 pl-5 text-ink">
+            <li>The partner and {deleting.contacts} contact log entr{deleting.contacts === 1 ? 'y' : 'ies'} are removed.</li>
+            <li>{deleting.customers} customer{deleting.customers === 1 ? '' : 's'} stay, without the partner credit.</li>
+          </ul>
+          {deleting.commissions > 0 && <p className="font-medium text-red-700 dark:text-red-400">{deleting.commissions} booking{deleting.commissions === 1 ? ' carries' : 's carry'} a commission for this partner. Erase {deleting.commissions === 1 ? 'that booking' : 'those bookings'} first.</p>}
+        </ConfirmErase>
+      )}
     </Page>
   );
 }

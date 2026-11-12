@@ -85,6 +85,7 @@ sales.get('/projects/:id/units', (req, res) => {
       `SELECT u.id, u.tower, u.floor, u.number, u.configuration, u.carpet_sqft, u.price_lakhs, u.status, u.hold_until,
         u.held_by, u.lead_id, h.name AS held_by_name, l.name AS lead_name,
         EXISTS (SELECT 1 FROM bookings b WHERE b.unit_id = u.id AND b.status = 'active') AS has_booking,
+        (SELECT b.id FROM bookings b WHERE b.unit_id = u.id ORDER BY b.id DESC LIMIT 1) AS booking_id,
         EXISTS (SELECT 1 FROM approvals a WHERE a.unit_id = u.id AND a.type = 'booking' AND a.status = 'pending') AS pending_booking
        FROM units u LEFT JOIN users h ON h.id = u.held_by LEFT JOIN leads l ON l.id = u.lead_id
        WHERE u.project_id = ? ORDER BY u.tower, u.floor DESC, u.number`,

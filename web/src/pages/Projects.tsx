@@ -1,7 +1,8 @@
 import { ArrowLeft, Building2, Pencil, Plus, QrCode, Users } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CustomerSearch, type Customer } from '../components/CustomerSearch.tsx';
+import { ConfirmErase, EraseBooking, EraseButton } from '../components/Erase.tsx';
 import { FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import {
@@ -115,6 +116,7 @@ function UnitModal({ unit, onClose }: { unit: any; onClose: () => void }) {
   const [amount, setAmount] = useState(unit.price_lakhs ? String(unit.price_lakhs) : '');
   const { busy, run } = useAction();
   const toastAfter = useToast();
+  const [erasing, setErasing] = useState<'' | 'booking' | 'flat'>('');
   const isAdmin = user!.role === 'admin';
   const holder = unit.held_by === user!.id;
   const canHold = can('unit.hold') && unit.status === 'Available';
@@ -155,7 +157,18 @@ function UnitModal({ unit, onClose }: { unit: any; onClose: () => void }) {
           {canHold && <Button onClick={() => open('hold')}>Hold flat</Button>}
           {canChangeCustomer && <Button onClick={() => open('customer')}>{unit.lead_id ? 'Change customer' : 'Set customer'}</Button>}
           {unit.status === 'Hold' && (can('inventory.manage') || holder) && <Button busy={busy} onClick={release}>Release hold</Button>}
+          {isAdmin && unit.booking_id && <EraseButton label="Erase booking" onClick={() => setErasing('booking')} />}
+          {isAdmin && <EraseButton label="Delete flat" onClick={() => setErasing('flat')} />}
         </div>
+      )}
+      {erasing === 'booking' && <EraseBooking bookingId={unit.booking_id} onClose={() => setErasing('')} onDone={onClose} />}
+      {erasing === 'flat' && (
+        <ConfirmErase title={`Delete flat ${unit.tower}-${unit.number}`} onClose={() => setErasing('')} onDone={onClose}
+          action={() => api.post('/erase/units', { ids: [unit.id] })}>
+          {unit.booking_id
+            ? <p className="text-ink">This flat has a booking record. Erase the booking first; the server will refuse otherwise.</p>
+            : <p className="text-ink">The flat is removed from the inventory{unit.status === 'Hold' ? `, including its hold for ${unit.lead_name}` : ''}. Customers are not deleted.</p>}
+        </ConfirmErase>
       )}
 
       {action && (
@@ -192,7 +205,19 @@ function Inventory({ project, onEdit }: { project: any; onEdit: () => void }) {
   const canEdit = user!.role === 'admin' || (user!.role === 'site_head' && user!.project_ids.includes(project.id));
   const filters = useFilters(['q', 'status', 'tower', 'configuration', 'budget'] as const, { prefix: 'u_' });
   const [showBuyers, setShowBuyers] = useState(false);
+  const [bulkDelete, setBulkDelete] = useState<any>(null);
+  const [deleteProject, setDeleteProject] = useState<any>(null);
+  const isAdmin = user!.role === 'admin';
   const { data: buyers } = useApi(showBuyers ? `/projects/${project.id}/buyers` : null);
+  const navigate = useNavigate();
+  const startBulkDelete = async () => {
+    const preview = await action.run(() => api.post('/erase/units/preview', { ids: shownUnits.map((u: any) => u.id) }));
+    if (preview) setBulkDelete(preview);
+  };
+  const startDeleteProject = async () => {
+    const preview = await action.run(() => api.get(`/erase/projects/${project.id}`));
+    if (preview) setDeleteProject(preview);
+  };
   const shownUnits = filterRows<any>(data?.units, filters.f, {
     search: (u) => [u.number],
     match: { status: (u) => u.status, tower: (u) => u.tower, configuration: (u) => u.configuration },
@@ -214,6 +239,7 @@ function Inventory({ project, onEdit }: { project: any; onEdit: () => void }) {
         <Button onClick={showQr}><QrCode size={15} />WhatsApp QR</Button>
         {canEdit && <Button onClick={onEdit}><Pencil size={15} />Edit project</Button>}
         {canManage && <Button variant="primary" onClick={() => setAdding(true)}><Plus size={16} />Add units</Button>}
+        {isAdmin && <EraseButton size="md" label="Delete project" onClick={startDeleteProject} />}
       </>} />
       <div className="mb-3 space-y-2">
         {!project.rera_number && <Notice>MahaRERA number is missing, so project marketing is blocked.</Notice>}
@@ -231,6 +257,9 @@ function Inventory({ project, onEdit }: { project: any; onEdit: () => void }) {
           <FilterPill label="Home type" value={filters.f.configuration} options={optionsFrom<any>(data.units, (u) => u.configuration)} onChange={(configuration) => filters.set({ configuration })} />
           <FilterPill label="Price" value={filters.f.budget} options={[{ value: 'lt100', label: 'Under ₹1 Cr' }, { value: '100-200', label: '₹1 to 2 Cr' }, { value: 'gt200', label: 'Above ₹2 Cr' }]} onChange={(budget) => filters.set({ budget })} />
         </FilterBar>
+      )}
+      {isAdmin && !!shownUnits.length && (
+        <div className="mb-3 flex justify-end"><EraseButton label={`Delete ${shownUnits.length === data?.units.length ? 'all' : 'the'} ${shownUnits.length} shown flat${shownUnits.length === 1 ? '' : 's'}`} onClick={startBulkDelete} /></div>
       )}
       {!data && <Spinner />}
       {data && !data.units.length && <Card><Empty title="No units added">Add towers and floors to track availability here.</Empty></Card>}
@@ -284,6 +313,23 @@ function Inventory({ project, onEdit }: { project: any; onEdit: () => void }) {
       )}
       {adding && <AddUnitsModal projectId={project.id} onClose={() => { setAdding(false); void reload(); }} />}
       {unit && <UnitModal unit={unit} onClose={() => { setUnit(null); void reload(); }} />}
+      {bulkDelete && (
+        <ConfirmErase title={`Delete ${bulkDelete.count} flats`} word="DELETE" onClose={() => setBulkDelete(null)} onDone={() => { setBulkDelete(null); void reload(); }}
+          action={() => api.post('/erase/units', { ids: shownUnits.map((u: any) => u.id) })}>
+          <p className="text-ink">Every flat shown with the current filters is removed: {bulkDelete.count} flat{bulkDelete.count === 1 ? '' : 's'}{bulkDelete.held ? `, ${bulkDelete.held} on hold` : ''}{bulkDelete.approvals ? `, and ${bulkDelete.approvals} approval request${bulkDelete.approvals === 1 ? '' : 's'} for them` : ''}. Customers are not deleted.</p>
+          {!!bulkDelete.blocked.length && <p className="font-medium text-red-700 dark:text-red-400">{bulkDelete.blocked.length} of them have a booking record ({bulkDelete.blocked.slice(0, 6).join(', ')}{bulkDelete.blocked.length > 6 ? '…' : ''}). Erase those bookings first, or filter them out; otherwise nothing is deleted.</p>}
+        </ConfirmErase>
+      )}
+      {deleteProject && (
+        <ConfirmErase title={`Delete project ${project.name}`} word={project.name} onClose={() => setDeleteProject(null)} onDone={() => navigate('/projects')}
+          action={() => api.post(`/erase/projects/${project.id}`, { confirm_name: project.name })}>
+          <ul className="list-disc space-y-0.5 pl-5 text-ink">
+            <li>{deleteProject.units} flat{deleteProject.units === 1 ? '' : 's'} and {deleteProject.visits} site visit{deleteProject.visits === 1 ? '' : 's'} are removed.</li>
+            <li>{deleteProject.customers} customer{deleteProject.customers === 1 ? '' : 's'} stay, without a project.</li>
+          </ul>
+          {deleteProject.bookings > 0 && <p className="font-medium text-red-700 dark:text-red-400">{deleteProject.bookings} booking record{deleteProject.bookings === 1 ? ' depends' : 's depend'} on this project. Erase {deleteProject.bookings === 1 ? 'it' : 'them'} first.</p>}
+        </ConfirmErase>
+      )}
     </Page>
   );
 }

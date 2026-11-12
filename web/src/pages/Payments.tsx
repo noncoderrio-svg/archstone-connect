@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { FilterBar, FilterPill, SearchBox, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
+import { ConfirmErase, EraseBooking, EraseButton } from '../components/Erase.tsx';
 import { Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, SelectField, Spinner, Stat, TextField, TextareaField, cx, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -65,11 +66,12 @@ function ReceiveModal({ payment, onClose }: { payment: any; onClose: (receipt?: 
 }
 
 export default function Payments() {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const { f, set, clear, activeCount } = useFilters(['project', 'q', 'state', 'stage'] as const);
   const { data, error, loading, reload } = useApi(`/payments/dashboard${f.project ? `?project=${f.project}` : ''}`, ['bookings']);
   const [followUp, setFollowUp] = useState<any>(null);
   const [receiving, setReceiving] = useState<any>(null);
+  const [erasing, setErasing] = useState<number | null>(null);
   if (loading && !data) return <Spinner />;
   if (error || !data) return <Page><ErrorNote>{error}</ErrorNote></Page>;
 
@@ -138,6 +140,7 @@ export default function Payments() {
                       <p className="text-[13px] text-muted">Flat {b.tower}-{b.unit_number} · {b.phone} · booked {prettyDate(b.created_at.slice(0, 10))}</p>
                     </div>
                     <p className="text-sm tabular-nums"><span className="font-semibold text-ink">{lakhs(b.collected_lakhs)}</span> <span className="text-muted">of {lakhs(b.amount_lakhs)} collected</span></p>
+                    {user!.role === 'admin' && <EraseButton onClick={() => setErasing(b.id)} />}
                   </div>
                   {!b.stages.length ? (
                     <p className="px-4 py-3 text-sm text-muted">No payment schedule yet. <Link to="/bookings" className="text-brand-ink hover:underline">Create one on Bookings</Link>.</p>
@@ -173,6 +176,7 @@ export default function Payments() {
       )}
       {followUp && <FollowUpModal payment={followUp} outcomes={data.outcomes} today={data.today} onClose={() => { setFollowUp(null); void reload(); }} />}
       {receiving && <ReceiveModal payment={receiving} onClose={closeReceive} />}
+      {erasing && <EraseBooking bookingId={erasing} onClose={() => setErasing(null)} onDone={() => { setErasing(null); void reload(); }} />}
     </Page>
   );
 }

@@ -1,10 +1,12 @@
 import { CalendarCheck, Clock, Flame, Phone, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROLE_LABELS, isLeadRole, isManager } from '../../../shared/domain.ts';
 import { BarList, Funnel } from '../components/Charts.tsx';
 import { DatePill, FilterBar, FilterPill, dateBounds, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { openAssistant } from '../components/Assistant.tsx';
+import { ConfirmErase, EraseBooking, EraseButton } from '../components/Erase.tsx';
 import { Badge, Button, Card, CardHeader, Empty, ErrorNote, PageHeader, Spinner, Stat, TempBadge } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -61,6 +63,30 @@ function Targets({ p }: { p: any }) {
         ))}
       </ul>
       <p className="px-4 py-3 text-xs text-muted">{p.score == null ? 'No target set for this month yet. ' : ''}{p.calls ? `${p.connect_rate}% connect rate · ${p.talk_minutes} min talk time` : ''}</p>
+    </Card>
+  );
+}
+
+/** Admin only: the newest bookings, with erase for mistakes. */
+function LatestBookings({ rows, onChange }: { rows: any[]; onChange: () => void }) {
+  const [erasing, setErasing] = useState<number | null>(null);
+  return (
+    <Card>
+      <CardHeader title="Latest bookings" action={<Link to="/bookings" className="text-sm text-brand-ink hover:underline">All bookings</Link>} />
+      {!rows.length ? <Empty title="No bookings yet" /> : (
+        <ul className="divide-y divide-line">
+          {rows.map((b) => (
+            <li key={b.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
+              <span className="min-w-0 flex-1"><Link to={`/leads/${b.lead_id}`} className="block truncate font-medium text-ink hover:underline">{b.lead_name}</Link>
+                <span className="block truncate text-xs text-muted">{b.project_name} · {b.tower}-{b.unit_number} · {ago(b.created_at)}</span></span>
+              <span className="font-medium text-ink tabular-nums">{lakhs(b.amount_lakhs)}</span>
+              {b.status !== 'active' && <Badge tone="red">Cancelled</Badge>}
+              <EraseButton onClick={() => setErasing(b.id)} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {erasing && <EraseBooking bookingId={erasing} onClose={() => setErasing(null)} onDone={() => { setErasing(null); onChange(); }} />}
     </Card>
   );
 }
@@ -248,6 +274,7 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {data.latest_bookings && <LatestBookings rows={data.latest_bookings} onChange={reload} />}
         {data.top_telecallers && <TopTelecallers rows={data.top_telecallers} />}
         {showTeam && (
           <Card className="lg:col-span-2">

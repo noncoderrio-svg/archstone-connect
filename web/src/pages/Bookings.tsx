@@ -2,6 +2,7 @@ import { Plus, Printer, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { COMPANY, HANDOVER_STAGES } from '../../../shared/domain.ts';
+import { ConfirmErase, EraseBooking, EraseButton } from '../components/Erase.tsx';
 import { DatePill, FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, toOptions, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { Badge, Button, Card, Empty, ErrorNote, IconButton, Input, Logo, Modal, Notice, PageHeader, SelectField, Spinner, Stat, TextField, useAction, useToast } from '../components/ui.tsx';
@@ -53,6 +54,7 @@ function BookingModal({ id, onClose }: { id: number; onClose: () => void }) {
   const [paying, setPaying] = useState<any>(null);
   const [reference, setReference] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [erasing, setErasing] = useState(false);
   const [reason, setReason] = useState('');
   const [portal, setPortal] = useState('');
   const toast = useToast();
@@ -124,9 +126,13 @@ function BookingModal({ id, onClose }: { id: number; onClose: () => void }) {
           </div>
         </div>
       )}
-      {user!.role === 'admin' && booking.status === 'active' && (
-        <Button size="sm" variant="ghost" className="mt-3 text-red-700 dark:text-red-400" onClick={() => setCancelling(true)}>Cancel booking</Button>
+      {user!.role === 'admin' && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {booking.status === 'active' && <Button size="sm" variant="ghost" className="text-red-700 dark:text-red-400" onClick={() => setCancelling(true)}>Cancel booking (keeps the record)</Button>}
+          <EraseButton label="Erase booking" onClick={() => setErasing(true)} />
+        </div>
       )}
+      {erasing && <EraseBooking bookingId={booking.id} onClose={() => setErasing(false)} onDone={onClose} />}
       {editing && <ScheduleEditor booking={booking} payments={payments} plan={default_plan} onClose={() => { setEditing(false); void reload(); }} />}
       {paying && (
         <Modal title={`Record ${paying.label}`} onClose={() => setPaying(null)}>

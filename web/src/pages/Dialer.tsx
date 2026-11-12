@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { DISPOSITIONS, isLeadRole } from '../../../shared/domain.ts';
 import { FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
+import { EraseButton } from '../components/Erase.tsx';
 import { Badge, Button, Card, Empty, ErrorNote, Modal, Notice, PageHeader, Select, Spinner, TempBadge, TextField, Textarea, cx, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -104,6 +105,29 @@ function NewListModal({ onClose }: { onClose: () => void }) {
           <Button variant="primary" busy={busy} disabled={!rows.length || !agents.length || f.name.trim().length < 2} onClick={submit}>Create list</Button>
         </div>
       </div>
+    </Modal>
+  );
+}
+
+/** Admin only. Keeps every number as a lead, or moves the uncalled ones to Deleted leads, where they can be restored. */
+function DeleteListModal({ list, onClose }: { list: any; onClose: () => void }) {
+  const { data } = useApi(`/erase/call-lists/${list.id}`);
+  const [mode, setMode] = useState<'keep' | 'move_uncalled'>('keep');
+  const { busy, run } = useAction();
+  const go = async () => { if (await run(() => api.post(`/erase/call-lists/${list.id}`, { mode }), 'List deleted')) onClose(); };
+  return (
+    <Modal title={`Delete list: ${list.name}`} onClose={onClose}>
+      {!data ? <Spinner /> : (
+        <div className="space-y-3 text-sm">
+          <p className="text-ink">{data.numbers} numbers, {data.uncalled} not called yet.</p>
+          <label className="flex items-start gap-2"><input type="radio" name="mode" className="mt-1 accent-[var(--brand)]" checked={mode === 'keep'} onChange={() => setMode('keep')} />
+            <span><b className="text-ink">Keep all numbers as leads.</b> Only the list goes.</span></label>
+          <label className="flex items-start gap-2"><input type="radio" name="mode" className="mt-1 accent-[var(--brand)]" checked={mode === 'move_uncalled'} onChange={() => setMode('move_uncalled')} />
+            <span><b className="text-ink">Also move the {data.uncalled} uncalled numbers to Deleted leads.</b> They can be restored from Settings, Deleted leads. Called numbers stay.</span></label>
+          <Notice>Deleting the list cannot be undone. It is written to the audit log.</Notice>
+          <div className="flex justify-end gap-2"><Button onClick={onClose}>Cancel</Button><Button variant="danger" busy={busy} onClick={go}>Delete list</Button></div>
+        </div>
+      )}
     </Modal>
   );
 }
@@ -302,6 +326,8 @@ export default function Dialer() {
   const [active, setActive] = useState<{ list: number | null } | null>(null);
   const [creating, setCreating] = useState(false);
   const [resplitting, setResplitting] = useState<any>(null);
+  const [deleting, setDeleting] = useState<any>(null);
+  const { user } = useAuth();
   const { f, set, clear, activeCount } = useFilters(['q', 'project', 'progress', 'sort'] as const);
   if (active) return <Page><Session list={active.list} onExit={() => { setActive(null); void reload(); }} /></Page>;
   const lists = filterRows<any>(data?.lists, f, {
@@ -337,12 +363,14 @@ export default function Dialer() {
             <div className="mt-2 flex flex-wrap gap-2">
               <Button size="sm" onClick={() => setActive({ list: l.id })}><Phone size={14} />Call this list</Button>
               {can('lead.reassign') && <Button size="sm" onClick={() => setResplitting(l)}><Shuffle size={14} />Re-split</Button>}
+              {user!.role === 'admin' && <EraseButton label="Delete list" onClick={() => setDeleting(l)} />}
             </div>
           </Card>
         ))}
       </div>
       {creating && <NewListModal onClose={() => { setCreating(false); void reload(); }} />}
       {resplitting && <ResplitModal list={resplitting} onClose={() => { setResplitting(null); void reload(); }} />}
+      {deleting && <DeleteListModal list={deleting} onClose={() => { setDeleting(null); void reload(); }} />}
     </Page>
   );
 }

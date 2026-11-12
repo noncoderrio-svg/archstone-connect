@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DatePill, FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
+import { ConfirmErase, EraseButton } from '../components/Erase.tsx';
 import { Badge, Button, Card, Empty, ErrorNote, PageHeader, Spinner, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -10,6 +12,7 @@ export default function Approvals() {
   const { can, user } = useAuth();
   const { data, error, loading, reload } = useApi('/approvals', ['approvals']);
   const { busy, run } = useAction();
+  const [deleting, setDeleting] = useState<any>(null);
   const { f, set, clear, activeCount } = useFilters(['q', 'status', 'type', 'project', 'date', 'from', 'to'] as const);
   if (loading) return <Spinner />;
   if (error || !data) return <Page><ErrorNote>{error}</ErrorNote></Page>;
@@ -53,10 +56,18 @@ export default function Approvals() {
                   <Button size="sm" busy={busy} onClick={() => decide(a.id, false)}>Reject</Button>
                 </span>
               )}
+              {user!.role === 'admin' && <EraseButton label="Delete" onClick={() => setDeleting(a)} />}
             </li>
           ))}
         </ul>
       </Card>
+      {deleting && (
+        <ConfirmErase title="Delete approval request" onClose={() => setDeleting(null)} onDone={() => { setDeleting(null); void reload(); }}
+          action={() => api.del(`/erase/approvals/${deleting.id}`)}>
+          <p className="text-ink">The {deleting.type} request for {deleting.lead_name} ({deleting.status}) is removed. The customer is kept.</p>
+          {deleting.type === 'booking' && deleting.status === 'approved' && <p className="text-muted">If a booking was made from this request, the server will refuse: erase the booking first.</p>}
+        </ConfirmErase>
+      )}
     </Page>
   );
 }

@@ -228,8 +228,18 @@ admin.get('/dashboard', (req, res) => {
   // Admins see every telecaller; a Site Head sees results on their own projects.
   const topTele = user.role === 'admin' ? topTelecallers(null) : user.role === 'site_head' ? topTelecallers(user.project_ids) : null;
 
+  // Admin only: the newest bookings, each with an erase button on the dashboard.
+  const latestBookings = user.role === 'admin'
+    ? all(
+        `SELECT b.id, b.status, b.amount_lakhs, b.created_at, l.id AS lead_id, l.name AS lead_name, u.tower, u.number AS unit_number, p.name AS project_name
+         FROM bookings b JOIN leads l ON l.id = b.lead_id JOIN units u ON u.id = b.unit_id JOIN projects p ON p.id = u.project_id
+         ORDER BY b.id DESC LIMIT 6`,
+      )
+    : null;
+
   res.json({
     top_telecallers: topTele,
+    latest_bookings: latestBookings,
     stats: {
       totalLeads: count('1 = 1'),
       newToday: count('l.created_at >= ?', today),

@@ -5,6 +5,7 @@ import {
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BUYER_FIELDS, DISPOSITIONS, DOCUMENT_TYPES, LANGUAGES, LOST_REASONS, STAGES, isManager, isViewOnly, CLOSING_ROLES } from '../../../shared/domain.ts';
+import { ConfirmErase, EraseButton } from '../components/Erase.tsx';
 import { openAssistant } from '../components/Assistant.tsx';
 import { LabelButton, LabelChip, useLabels } from '../components/Labels.tsx';
 import { Page } from '../components/Layout.tsx';
@@ -239,7 +240,8 @@ function CostSheetModal({ lead, onClose }: { lead: any; onClose: () => void }) {
 }
 
 function Documents({ leadId, documents, onChange }: { leadId: number; documents: any[]; onChange: () => void }) {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const [removing, setRemoving] = useState<any>(null);
   const [type, setType] = useState<string>(DOCUMENT_TYPES[0]);
   const input = useRef<HTMLInputElement>(null);
   const { busy, run } = useAction();
@@ -281,10 +283,17 @@ function Documents({ leadId, documents, onChange }: { leadId: number; documents:
                 </>
               )}
               {!d.in_drive && <Button size="sm" variant="ghost" onClick={() => toDrive(d.id)}><HardDriveUpload size={14} />Drive</Button>}
+              {user!.role === 'admin' && <EraseButton label="Delete file" onClick={() => setRemoving(d)} />}
             </div>
           </li>
         ))}
       </ul>
+      {removing && (
+        <ConfirmErase title={`Delete ${removing.type}`} actionLabel="Delete file" onClose={() => setRemoving(null)} onDone={() => { setRemoving(null); onChange(); }}
+          action={() => api.del(`/erase/documents/${removing.id}`)}>
+          <p className="text-ink">"{removing.filename}" is deleted from the server's disk and from this customer's record. The customer is kept.</p>
+        </ConfirmErase>
+      )}
     </Card>
   );
 }

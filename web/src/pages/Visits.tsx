@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DatePill, FUTURE_PRESETS, FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
+import { ConfirmErase, EraseButton } from '../components/Erase.tsx';
 import { Badge, Button, Card, Empty, ErrorNote, Modal, PageHeader, SelectField, Spinner, TextField, TextareaField, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -74,6 +75,7 @@ export default function Visits() {
   const { data, error, loading, reload } = useApi('/visits', ['visits']);
   const [checkIn, setCheckIn] = useState<any>(null);
   const [closing, setClosing] = useState<any>(null);
+  const [deleting, setDeleting] = useState<any>(null);
   const { f, set, clear, activeCount } = useFilters(['q', 'status', 'project', 'host', 'kind', 'date', 'from', 'to'] as const);
   if (loading) return <Spinner />;
   if (error || !data) return <Page><ErrorNote>{error}</ErrorNote></Page>;
@@ -103,6 +105,7 @@ export default function Visits() {
           )}
           {works && v.status === 'Scheduled' && can('visit.checkin') && <Button size="sm" variant="primary" onClick={() => setCheckIn(v)}>Check in</Button>}
           {works && ['Scheduled', 'Checked In'].includes(v.status) && <Button size="sm" onClick={() => setClosing(v)}>Close</Button>}
+          {user!.role === 'admin' && <EraseButton label="Delete" onClick={() => setDeleting(v)} />}
         </li>
       ))}
     </ul>
@@ -127,6 +130,12 @@ export default function Visits() {
       </div>
       {checkIn && <CheckInModal visit={checkIn} onClose={after} />}
       {closing && <CloseModal visit={closing} onClose={after} />}
+      {deleting && (
+        <ConfirmErase title="Delete site visit" onClose={() => setDeleting(null)} onDone={() => { setDeleting(null); void reload(); }}
+          action={() => api.del(`/erase/visits/${deleting.id}`)}>
+          <p className="text-ink">The {deleting.status.toLowerCase()} visit for {deleting.lead_name} on {dateTime(deleting.scheduled_at)} is removed. The customer is kept.</p>
+        </ConfirmErase>
+      )}
     </Page>
   );
 }
