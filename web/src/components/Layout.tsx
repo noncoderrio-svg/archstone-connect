@@ -292,7 +292,7 @@ function Notifications() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="fade-in scroll-thin absolute right-0 z-40 mt-1 max-h-96 w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border border-line bg-surface shadow-xl">
+          <div className="fade-in scroll-thin absolute right-0 z-40 mt-1 max-h-[min(24rem,calc(100dvh-6rem))] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-xl border border-line bg-surface shadow-xl">
             <p className="px-4 pt-2.5 text-sm font-semibold text-ink">Notifications</p>
             <div className="flex gap-1 border-b border-line px-3 py-1.5" role="tablist" aria-label="Notification type">
               {KIND_TABS.map(([key, label]) => (
@@ -369,7 +369,7 @@ export function Layout() {
               : `You are offline. Showing saved data.${pending ? ` ${pending} update${pending > 1 ? 's' : ''} will send when you reconnect.` : ''}`}
           </p>
         )}
-        <header className="frost relative z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line/70 px-2 pt-[env(safe-area-inset-top)] sm:gap-2 sm:px-3 lg:px-5">
+        <header className="frost relative z-40 flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line/70 px-2 pt-[env(safe-area-inset-top)] sm:gap-2 sm:px-3 lg:px-5">
           <IconButton label="Open menu" className="lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={20} /></IconButton>          <span className="font-display text-base font-semibold text-ink sm:hidden">Archstone Connect</span>
           <form onSubmit={search} role="search" className="relative hidden max-w-md flex-1 sm:block">
             <Search size={16} className="absolute top-2.5 left-3 text-muted" />
