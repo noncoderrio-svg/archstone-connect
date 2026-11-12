@@ -5,7 +5,7 @@ import { config } from './config.ts';
 import { all, get, minutesFromNow, nowIso, run, tx } from './db.ts';
 import { generatePassword, hashPassword } from './auth.ts';
 import { ingestLead, logActivity, rescore } from './services/leads.ts';
-import { migrateRoles } from './migrations.ts';
+import { addNewPermissions, migrateRoles } from './migrations.ts';
 
 const DATA_DIR = dirname(config.dbPath);
 const CREDENTIALS_FILE = join(DATA_DIR, 'first-login-passwords.txt');
@@ -87,6 +87,7 @@ function ensureDemoNumbers() {
 /** Creates what every installation needs. Safe to run on each start. */
 export async function ensureBaseData() {
   migrateRoles();
+  addNewPermissions();
   ensureDefaults();
   if (get('SELECT 1 AS x FROM users LIMIT 1')) {
     ensureDemoNumbers();

@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Role } from '../../shared/domain.ts';
-import { HttpError, permissionsFor, requirePermission, type SessionUser } from '../auth.ts';
+import { HttpError, assertCan, permissionsFor, requirePermission, type SessionUser } from '../auth.ts';
 import { all, get, getSetting, minutesFromNow, nowIso, run, tx } from '../db.ts';
 import { audit, broadcast, leadScope, notify, notifyUrgent, visibleLead, workableLead } from '../services/core.ts';
 import { addVisitToCalendar, isConnected, removeVisitFromCalendar } from '../services/google.ts';
@@ -83,7 +83,9 @@ sales.get('/projects/:id/units', (req, res) => {
   res.json({
     units: all(
       `SELECT u.id, u.tower, u.floor, u.number, u.configuration, u.carpet_sqft, u.price_lakhs, u.status, u.hold_until,
-        h.name AS held_by_name, l.name AS lead_name
+        u.held_by, u.lead_id, h.name AS held_by_name, l.name AS lead_name,
+        EXISTS (SELECT 1 FROM bookings b WHERE b.unit_id = u.id AND b.status = 'active') AS has_booking,
+        EXISTS (SELECT 1 FROM approvals a WHERE a.unit_id = u.id AND a.type = 'booking' AND a.status = 'pending') AS pending_booking
        FROM units u LEFT JOIN users h ON h.id = u.held_by LEFT JOIN leads l ON l.id = u.lead_id
        WHERE u.project_id = ? ORDER BY u.tower, u.floor DESC, u.number`,
       Number(req.params.id),
@@ -120,7 +122,7 @@ sales.post('/projects/:id/units', requirePermission('inventory.manage'), (req, r
 });
 
 sales.post('/units/:id/hold', (req, res) => {
-  if (!['admin', 'site_head', 'sourcing_manager', 'closing_manager', 'telecaller'].includes(req.user.role)) throw new HttpError(403, 'You cannot hold units.');
+  assertCan(req.user, 'unit.hold');
   const unitId = Number(req.params.id);
   const { lead_id } = z.object({ lead_id: z.number().int() }).parse(req.body);
   const lead = workableLead(req.user, lead_id);
@@ -162,24 +164,125 @@ sales.post('/approvals', (req, res) => {
     discount_percent: z.number().min(0).max(50).default(0),
     note: z.string().max(500).default(''),
   }).parse(req.body);
+  if (b.type === 'booking') assertCan(req.user, 'unit.book');
   const lead = workableLead(req.user, b.lead_id);
-  const unit = get<any>('SELECT * FROM units WHERE id = ?', b.unit_id);
+  const unit = bookableUnit(b.unit_id, lead.id);
+  const id = requestApproval(req.user, b.type, lead, unit, b.amount_lakhs, b.discount_percent, b.note);
+  res.status(201).json({ id });
+});
+
+/** A flat that can still be booked for this customer. */
+function bookableUnit(unitId: number, leadId: number) {
+  const unit = get<any>('SELECT * FROM units WHERE id = ?', unitId);
   if (!unit) throw new HttpError(404, 'Unit not found.');
   if (['Booked', 'Sold'].includes(unit.status)) throw new HttpError(409, 'This unit is already booked.');
-  if (unit.status === 'Hold' && unit.lead_id !== lead.id) throw new HttpError(409, 'This unit is on hold for another lead.');
+  if (unit.status === 'Hold' && unit.lead_id !== leadId) throw new HttpError(409, 'This unit is on hold for another lead.');
+  return unit;
+}
+
+function requestApproval(user: SessionUser, type: 'booking' | 'discount', lead: any, unit: any, amount: number, discount: number, note: string) {
+  if (type === 'booking' && get(`SELECT 1 AS x FROM approvals WHERE unit_id = ? AND type = 'booking' AND status = 'pending'`, unit.id)) {
+    throw new HttpError(409, 'This flat already has a booking request waiting for approval.');
+  }
   const r = run(
     `INSERT INTO approvals(type, lead_id, unit_id, amount_lakhs, discount_percent, note, requested_by) VALUES(?, ?, ?, ?, ?, ?, ?)`,
-    b.type, lead.id, unit.id, b.amount_lakhs, b.discount_percent, b.note, req.user.id,
+    type, lead.id, unit.id, amount, discount, note, user.id,
   );
-  logActivity(lead.id, 'approval', `${b.type === 'booking' ? 'Booking' : 'Discount'} approval requested`, b.note, req.user.id);
+  logActivity(lead.id, 'approval', `${type === 'booking' ? 'Booking' : 'Discount'} approval requested`, note, user.id);
   // The nearest manager who may approve gets it. Anyone else stays as the backup when there is none.
-  const nearest = managerChain(req.user.id).find((id) => {
+  const nearest = managerChain(user.id).find((id) => {
     const person = get<{ role: Role }>('SELECT role FROM users WHERE id = ?', id)!;
     return permissionsFor(id, person.role).includes('approval.review');
   });
-  for (const u of nearest ? [{ id: nearest }] : reviewersFor(unit.project_id)) notifyUrgent(u.id, 'Approval needed', `${lead.name} · ${b.type}`, '/approvals');
+  for (const u of nearest ? [{ id: nearest }] : reviewersFor(unit.project_id)) notifyUrgent(u.id, 'Approval needed', `${lead.name} · ${type}`, '/approvals');
   broadcast('approvals');
-  res.status(201).json({ id: r.id });
+  return r.id;
+}
+
+/** Marks the flat booked, moves the customer to Booked and records the booking and any partner commission. */
+function createBooking(lead: any, unitId: number, amount: number, discount: number, approvalId: number | null, actorId: number) {
+  const { changes } = run(
+    `UPDATE units SET status = 'Booked', lead_id = ?, held_by = NULL, hold_until = NULL
+     WHERE id = ? AND (status = 'Available' OR (status = 'Hold' AND lead_id = ?))`,
+    lead.id, unitId, lead.id,
+  );
+  if (!changes) throw new HttpError(409, 'This unit has already been booked.');
+  run(`UPDATE leads SET stage = 'Booked', updated_at = ? WHERE id = ?`, nowIso(), lead.id);
+  logActivity(lead.id, 'stage', `Stage: ${lead.stage} → Booked`, `₹${amount} Lakhs`, actorId);
+  rescore(lead.id);
+  const booking = run(
+    'INSERT INTO bookings(lead_id, unit_id, approval_id, amount_lakhs, discount_percent) VALUES(?, ?, ?, ?, ?)',
+    lead.id, unitId, approvalId, amount, discount,
+  );
+  const partner = lead.partner_id ? get<any>('SELECT id, commission_percent FROM partners WHERE id = ?', lead.partner_id) : null;
+  if (partner?.commission_percent) {
+    run(
+      'INSERT INTO commissions(partner_id, booking_id, percent, amount_lakhs) VALUES(?, ?, ?, ?)',
+      partner.id, booking.id, partner.commission_percent, Math.round(amount * partner.commission_percent * 1000) / 100000,
+    );
+  }
+  return booking.id;
+}
+
+/** "Book flat" from the flat's own window. An admin's booking is final at once; anyone else's goes for approval. */
+sales.post('/units/:id/book', (req, res) => {
+  assertCan(req.user, 'unit.book');
+  const b = z.object({
+    lead_id: z.number().int(),
+    amount_lakhs: z.number().positive(),
+    discount_percent: z.number().min(0).max(50).default(0),
+    note: z.string().max(500).default(''),
+  }).parse(req.body);
+  const lead = workableLead(req.user, b.lead_id);
+  const unit = bookableUnit(Number(req.params.id), lead.id);
+  if (req.user.role !== 'admin') {
+    const id = requestApproval(req.user, 'booking', lead, unit, b.amount_lakhs, b.discount_percent, b.note);
+    return res.status(202).json({ status: 'pending', approval_id: id });
+  }
+  const bookingId = tx(() => createBooking(lead, unit.id, b.amount_lakhs, b.discount_percent, null, req.user.id));
+  audit(req, 'booking.direct', 'booking', bookingId, `unit ${unit.id}, ${b.amount_lakhs}L`);
+  broadcast('inventory');
+  broadcast('leads');
+  broadcast('bookings');
+  res.status(201).json({ status: 'booked', booking_id: bookingId });
+});
+
+/**
+ * Sets or changes the customer on a held or booked flat.
+ * A held flat: the person holding it, or an inventory manager. A booked flat: the booking right.
+ * A flat with a booking record keeps its buyer; that booking must be cancelled or erased first.
+ */
+sales.post('/units/:id/customer', (req, res) => {
+  const unit = get<any>('SELECT * FROM units WHERE id = ?', Number(req.params.id));
+  if (!unit) throw new HttpError(404, 'Unit not found.');
+  const { lead_id } = z.object({ lead_id: z.number().int() }).parse(req.body);
+  if (unit.status === 'Hold') {
+    if (unit.held_by !== req.user.id && !req.user.permissions.includes('inventory.manage')) {
+      throw new HttpError(403, 'Only the person holding this flat or an inventory manager can change its customer.');
+    }
+    if (get(`SELECT 1 AS x FROM approvals WHERE unit_id = ? AND type = 'booking' AND status = 'pending'`, unit.id)) {
+      throw new HttpError(409, 'This flat has a booking request waiting. Approve or reject it first.');
+    }
+  } else if (['Booked', 'Sold'].includes(unit.status)) {
+    assertCan(req.user, 'unit.book');
+    if (get(`SELECT 1 AS x FROM bookings WHERE unit_id = ? AND status = 'active'`, unit.id)) {
+      throw new HttpError(409, 'This flat has a booking record, so it keeps its buyer.');
+    }
+  } else {
+    throw new HttpError(409, 'Only a held or booked flat has a customer to change.');
+  }
+  const lead = workableLead(req.user, lead_id);
+  if (lead.id === unit.lead_id) return res.json({ ok: true });
+  const before = unit.lead_id ? get<any>('SELECT id, name FROM leads WHERE id = ?', unit.lead_id) : null;
+  tx(() => {
+    run('UPDATE units SET lead_id = ? WHERE id = ?', lead.id, unit.id);
+    const label = `Flat ${unit.tower}-${unit.number}`;
+    logActivity(lead.id, 'inventory', `${label} set to this customer`, before ? `Previously ${before.name}` : '', req.user.id);
+    if (before) logActivity(before.id, 'inventory', `${label} moved to another customer`, lead.name, req.user.id);
+  });
+  audit(req, 'unit.customer', 'unit', unit.id, `${before?.id ?? 'none'} → ${lead.id}`);
+  broadcast('inventory');
+  res.json({ ok: true });
 });
 
 sales.get('/approvals', (req, res) => {
@@ -208,28 +311,7 @@ sales.post('/approvals/:id/review', requirePermission('approval.review'), (req, 
     throw new HttpError(403, `Discounts above ${limit}% need admin approval.`);
   }
   tx(() => {
-    if (approve && a.type === 'booking') {
-      const { changes } = run(
-        `UPDATE units SET status = 'Booked', lead_id = ?, held_by = NULL, hold_until = NULL
-         WHERE id = ? AND (status = 'Available' OR (status = 'Hold' AND lead_id = ?))`,
-        a.lead_id, a.unit_id, a.lead_id,
-      );
-      if (!changes) throw new HttpError(409, 'This unit has already been booked.');
-      run(`UPDATE leads SET stage = 'Booked', updated_at = ? WHERE id = ?`, nowIso(), a.lead_id);
-      logActivity(a.lead_id, 'stage', `Stage: ${lead.stage} → Booked`, `₹${a.amount_lakhs} Lakhs`, req.user.id);
-      rescore(a.lead_id);
-      const booking = run(
-        'INSERT INTO bookings(lead_id, unit_id, approval_id, amount_lakhs, discount_percent) VALUES(?, ?, ?, ?, ?)',
-        a.lead_id, a.unit_id, a.id, a.amount_lakhs, a.discount_percent,
-      );
-      const partner = lead.partner_id ? get<any>('SELECT id, commission_percent FROM partners WHERE id = ?', lead.partner_id) : null;
-      if (partner?.commission_percent) {
-        run(
-          'INSERT INTO commissions(partner_id, booking_id, percent, amount_lakhs) VALUES(?, ?, ?, ?)',
-          partner.id, booking.id, partner.commission_percent, Math.round(a.amount_lakhs * partner.commission_percent * 1000) / 100000,
-        );
-      }
-    }
+    if (approve && a.type === 'booking') createBooking(lead, a.unit_id, a.amount_lakhs, a.discount_percent, a.id, req.user.id);
     run(
       `UPDATE approvals SET status = ?, reviewed_by = ?, reviewed_at = ?, note = CASE WHEN ? != '' THEN ? ELSE note END WHERE id = ?`,
       approve ? 'approved' : 'rejected', req.user.id, nowIso(), note ?? '', note ?? '', a.id,

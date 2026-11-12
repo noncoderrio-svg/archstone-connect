@@ -120,3 +120,17 @@ test('Sourcing and Closing Managers see their own and their team\'s leads, not e
   assert.deepEqual(names, ['Mine', 'Report lead']);
   assert.ok(own);
 });
+
+test('permissions added later reach saved role sets once, by their defaults', async () => {
+  const { addNewPermissions } = await import('../server/migrations.ts');
+  db.setSetting('permissions_version', 2);
+  db.setSetting('role_permissions', { closing_manager: ['lead.create'], sourcing_manager: ['lead.create'] });
+  addNewPermissions();
+  const saved = db.getSetting('role_permissions', {});
+  assert.deepEqual(saved.closing_manager.sort(), ['lead.create', 'unit.hold']);
+  assert.deepEqual(saved.sourcing_manager.sort(), ['lead.create', 'unit.book', 'unit.hold']);
+  // An admin who later takes a permission away keeps that choice.
+  db.setSetting('role_permissions', { closing_manager: ['lead.create'] });
+  addNewPermissions();
+  assert.deepEqual(db.getSetting('role_permissions', {}).closing_manager, ['lead.create']);
+});

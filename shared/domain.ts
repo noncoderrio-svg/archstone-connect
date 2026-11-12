@@ -204,6 +204,8 @@ export const PERMISSION_GROUPS = [
     items: [
       ['call.office', 'Call through the office line'],
       ['visit.checkin', 'Check in site visits'],
+      ['unit.hold', 'Hold a flat'],
+      ['unit.book', 'Book a flat'],
       ['inventory.manage', 'Manage units'],
       ['approval.review', 'Approve bookings and discounts'],
       ['booking.manage', 'Manage bookings and payments'],
@@ -237,12 +239,17 @@ const EVERYONE: Action[] = ['lead.create', 'whatsapp.send', 'campaign.create', '
 /** Starting points. An admin can change any of these, by role or for one person. */
 export const PERMISSIONS: Record<Role, Action[]> = {
   admin: [...ACTIONS],
-  site_head: [...EVERYONE, 'lead.reassign', 'inventory.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage'],
-  sourcing_manager: [...EVERYONE, 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage'],
-  closing_manager: [...EVERYONE, 'lead.reassign', 'approval.review', 'reports.view', 'visit.checkin'],
+  site_head: [...EVERYONE, 'unit.hold', 'unit.book', 'lead.reassign', 'inventory.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage'],
+  sourcing_manager: [...EVERYONE, 'unit.hold', 'unit.book', 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage'],
+  closing_manager: [...EVERYONE, 'unit.hold', 'lead.reassign', 'approval.review', 'reports.view', 'visit.checkin'],
   payment_followup: ['ai.use'],
-  telecaller: [...EVERYONE],
+  telecaller: [...EVERYONE, 'unit.hold'],
 };
+
+/** Permissions added after the first release, with the version that added them. Saved role sets get the defaults once. */
+export const ADDED_ACTIONS: { version: number; actions: Action[] }[] = [
+  { version: 3, actions: ['unit.hold', 'unit.book'] },
+];
 
 export const DATA_SCOPES = [
   { value: '', label: 'Default for role' },

@@ -120,18 +120,21 @@ function BookingModal({ lead, onClose }: { lead: any; onClose: () => void }) {
   const { data } = useApi(lead.project_id ? `/projects/${lead.project_id}/units` : null, ['inventory']);
   const [f, setF] = useState({ unit_id: '', amount: '', discount: '0', note: '' });
   const { busy, run } = useAction();
-  const units = data?.units.filter((u: any) => u.status === 'Available' || (u.status === 'Hold' && u.lead_name === lead.name)) ?? [];
+  const toast = useToast();
+  const { user } = useAuth();
+  const units = data?.units.filter((u: any) => !u.pending_booking && (u.status === 'Available' || (u.status === 'Hold' && u.lead_id === lead.id))) ?? [];
   const pick = (unitId: string) => {
     const u = units.find((x: any) => String(x.id) === unitId);
     setF({ ...f, unit_id: unitId, amount: u?.price_lakhs ? String(u.price_lakhs) : '' });
   };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const body = { type: 'booking', lead_id: lead.id, unit_id: Number(f.unit_id), amount_lakhs: Number(f.amount), discount_percent: Number(f.discount), note: f.note };
-    if (await run(() => api.post('/approvals', body), 'Booking sent for approval')) onClose();
+    const body = { lead_id: lead.id, amount_lakhs: Number(f.amount), discount_percent: Number(f.discount), note: f.note };
+    const r = await run(() => api.post(`/units/${f.unit_id}/book`, body));
+    if (r) { toast(r.status === 'booked' ? 'Flat booked' : 'Booking sent for approval'); onClose(); }
   };
   return (
-    <Modal title="Request booking" onClose={onClose}>
+    <Modal title={user!.role === 'admin' ? 'Book a flat' : 'Request booking'} onClose={onClose}>
       {!lead.project_id ? <Notice>Choose a project for this lead first.</Notice> : (
         <form onSubmit={submit} className="space-y-3">
           <SelectField label="Unit" required value={f.unit_id} onChange={(e) => pick(e.target.value)}>
@@ -143,7 +146,7 @@ function BookingModal({ lead, onClose }: { lead: any; onClose: () => void }) {
             <TextField label="Discount (%)" type="number" step="0.1" min="0" max="50" value={f.discount} onChange={(e) => setF({ ...f, discount: e.target.value })} />
           </div>
           <TextareaField label="Note for approver" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} />
-          <div className="flex justify-end gap-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" busy={busy}>Send for approval</Button></div>
+          <div className="flex justify-end gap-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" busy={busy}>{user!.role === 'admin' ? 'Book now' : 'Send for approval'}</Button></div>
         </form>
       )}
     </Modal>
@@ -387,7 +390,7 @@ export default function LeadDetail() {
   const readOnly = isViewOnly(user!.role);
   const language = LANGUAGES.find((l) => l.code === lead.language)?.label;
   const canHandoff = isManager(user!.role) || (user!.role === 'telecaller' && lead.owner_id === user!.id);
-  const canBook = isManager(user!.role);
+  const canBook = can('unit.book');
 
   const addNote = async () => {
     if (await run(() => postOrQueue(`/leads/${id}/note`, { body: note }))) { setNote(''); void reload(); }

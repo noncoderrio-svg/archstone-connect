@@ -1,4 +1,4 @@
-import { ACTIONS, LEGACY_ROLES, ROLES, type Action, type Role } from '../shared/domain.ts';
+import { ACTIONS, ADDED_ACTIONS, LEGACY_ROLES, PERMISSIONS, ROLES, type Action, type Role } from '../shared/domain.ts';
 import { all, getSetting, run, setSetting, tx } from './db.ts';
 
 /** The default permissions each role had before the role change, needed to merge saved sets. */
@@ -52,5 +52,25 @@ export function migrateRoles() {
 
     run(`INSERT INTO audit_log(action, entity, detail) VALUES('roles.migrate', 'user', ?)`, moved.join('; ') || 'no users to move');
     setSetting(MARK, true);
+  });
+}
+
+/**
+ * A role set saved by an admin does not know about permissions added later.
+ * Each new permission is given to the roles that have it by default, once, and never again.
+ */
+export function addNewPermissions() {
+  const done = getSetting<number>('permissions_version', 2);
+  const pending = ADDED_ACTIONS.filter((a) => a.version > done);
+  if (!pending.length) return;
+  tx(() => {
+    const saved = getSetting<Partial<Record<Role, Action[]>>>('role_permissions', {});
+    for (const role of Object.keys(saved) as Role[]) {
+      const set = new Set(saved[role]);
+      for (const step of pending) for (const a of step.actions) if (PERMISSIONS[role]?.includes(a)) set.add(a);
+      saved[role] = [...set];
+    }
+    if (Object.keys(saved).length) setSetting('role_permissions', saved);
+    setSetting('permissions_version', Math.max(...pending.map((p) => p.version)));
   });
 }

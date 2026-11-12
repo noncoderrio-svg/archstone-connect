@@ -105,8 +105,9 @@ async function makeBooking(phone: string, projectName = 'Skyline Residences', pa
   if (partnerId) await users.admin.post(`/api/leads/${lead.data.id}/partner`, { partner_id: partnerId });
   const p = await project(projectName);
   const unit = (await users.admin.get(`/api/projects/${p.id}/units`)).data.units.find((u: any) => u.status === 'Available');
-  const approval = await users.sales1.post('/api/approvals', { type: 'booking', lead_id: lead.data.id, unit_id: unit.id, amount_lakhs: 100 });
-  assert.equal((await users.head.post(`/api/approvals/${approval.data.id}/review`, { approve: true })).status, 200);
+  // Closing Managers cannot book, so the Site Head asks and an admin approves.
+  const approval = await users.head.post('/api/approvals', { type: 'booking', lead_id: lead.data.id, unit_id: unit.id, amount_lakhs: 100 });
+  assert.equal((await users.admin.post(`/api/approvals/${approval.data.id}/review`, { approve: true })).status, 200);
   const booking = (await users.admin.get('/api/bookings')).data.bookings.find((b: any) => b.lead_id === lead.data.id);
   return { leadId: lead.data.id, booking, unit };
 }

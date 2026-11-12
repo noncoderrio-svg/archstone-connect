@@ -316,12 +316,13 @@ test('two people cannot book the same unit', async () => {
   const salesUser = (await users.sales1.get('/api/auth/me')).data.user;
   await users.admin.post('/api/leads/assign', { lead_ids: [a.data.id, b.data.id], owner_id: salesUser.id });
 
-  const r1 = await users.sales1.post('/api/approvals', { type: 'booking', lead_id: a.data.id, unit_id: unit.id, amount_lakhs: 95 });
-  const r2 = await users.sales1.post('/api/approvals', { type: 'booking', lead_id: b.data.id, unit_id: unit.id, amount_lakhs: 95 });
+  // Closing Managers cannot book, so the Site Head asks. A second request for the same flat is refused at once.
+  const r1 = await users.head.post('/api/approvals', { type: 'booking', lead_id: a.data.id, unit_id: unit.id, amount_lakhs: 95 });
+  const r2 = await users.head.post('/api/approvals', { type: 'booking', lead_id: b.data.id, unit_id: unit.id, amount_lakhs: 95 });
   assert.equal(r1.status, 201);
-  assert.equal(r2.status, 201);
-  assert.equal((await users.head.post(`/api/approvals/${r1.data.id}/review`, { approve: true })).status, 200);
-  assert.equal((await users.head.post(`/api/approvals/${r2.data.id}/review`, { approve: true })).status, 409);
+  assert.equal(r2.status, 409);
+  assert.equal((await users.admin.post(`/api/approvals/${r1.data.id}/review`, { approve: true })).status, 200);
+  assert.equal((await users.head.post('/api/approvals', { type: 'booking', lead_id: b.data.id, unit_id: unit.id, amount_lakhs: 95 })).status, 409, 'booked flats cannot be requested');
   assert.equal((await users.sales1.post(`/api/units/${unit.id}/hold`, { lead_id: b.data.id })).status, 409);
   assert.equal((await users.admin.get(`/api/leads/${a.data.id}`)).data.lead.stage, 'Booked');
   assert.equal((await users.admin.get(`/api/leads/${b.data.id}`)).data.lead.stage, 'Not Contacted');

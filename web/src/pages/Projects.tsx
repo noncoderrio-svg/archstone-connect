@@ -1,10 +1,11 @@
 import { ArrowLeft, Building2, Pencil, Plus, QrCode, Users } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { CustomerSearch, type Customer } from '../components/CustomerSearch.tsx';
 import { FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import {
-  Badge, Button, Card, Empty, ErrorNote, Modal, Notice, PageHeader, SelectField, Spinner, TextField, TextareaField, cx, useAction,
+  Badge, Button, Card, Empty, ErrorNote, Modal, Notice, PageHeader, SelectField, Spinner, TextField, TextareaField, cx, useAction, useToast,
 } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -105,14 +106,36 @@ function AddUnitsModal({ projectId, onClose }: { projectId: number; onClose: () 
   );
 }
 
+type UnitAction = '' | 'hold' | 'book' | 'customer';
+
 function UnitModal({ unit, onClose }: { unit: any; onClose: () => void }) {
   const { user, can } = useAuth();
-  const { data } = useApi('/leads?board=1');
-  const [leadId, setLeadId] = useState('');
+  const [action, setAction] = useState<UnitAction>('');
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [amount, setAmount] = useState(unit.price_lakhs ? String(unit.price_lakhs) : '');
   const { busy, run } = useAction();
-  const canHold = ['admin', 'site_head', 'sourcing_manager', 'closing_manager', 'telecaller'].includes(user!.role);
-  const hold = async () => { if (await run(() => api.post(`/units/${unit.id}/hold`, { lead_id: Number(leadId) }), 'Unit held')) onClose(); };
-  const release = async () => { if (await run(() => api.post(`/units/${unit.id}/release`), 'Unit released')) onClose(); };
+  const toastAfter = useToast();
+  const isAdmin = user!.role === 'admin';
+  const holder = unit.held_by === user!.id;
+  const canHold = can('unit.hold') && unit.status === 'Available';
+  const canBook = can('unit.book') && (unit.status === 'Available' || (unit.status === 'Hold' && !unit.pending_booking)) && !unit.has_booking;
+  const canChangeCustomer = !unit.has_booking && (
+    (unit.status === 'Hold' && !unit.pending_booking && (holder || can('inventory.manage'))) ||
+    (['Booked', 'Sold'].includes(unit.status) && can('unit.book'))
+  );
+  const open = (a: UnitAction) => {
+    setAction(a);
+    // Booking a held flat starts with the customer it is held for.
+    setCustomer(a === 'book' && unit.status === 'Hold' && unit.lead_id ? { id: unit.lead_id, name: unit.lead_name, phone: '', stage: 'Held for' } : null);
+  };
+  const hold = async () => { if (await run(() => api.post(`/units/${unit.id}/hold`, { lead_id: customer!.id }), 'Flat held')) onClose(); };
+  const release = async () => { if (await run(() => api.post(`/units/${unit.id}/release`), 'Hold released')) onClose(); };
+  const book = async () => {
+    const r = await run(() => api.post(`/units/${unit.id}/book`, { lead_id: customer!.id, amount_lakhs: Number(amount) }));
+    if (r) { toastAfter(r.status === 'booked' ? 'Flat booked' : 'Booking sent for approval'); onClose(); }
+  };
+  const setOwner = async () => { if (await run(() => api.post(`/units/${unit.id}/customer`, { lead_id: customer!.id }), 'Customer updated')) onClose(); };
+
   return (
     <Modal title={`Unit ${unit.number}, Tower ${unit.tower}`} onClose={onClose}>
       <dl className="grid grid-cols-2 gap-2 text-sm">
@@ -123,17 +146,34 @@ function UnitModal({ unit, onClose }: { unit: any; onClose: () => void }) {
         {unit.lead_name && <div><dt className="text-muted">Customer</dt><dd className="font-medium text-ink">{unit.lead_name}</dd></div>}
         {unit.hold_until && <div><dt className="text-muted">Held until</dt><dd className="font-medium text-ink">{dateTime(unit.hold_until)}</dd></div>}
       </dl>
-      {unit.status === 'Available' && canHold && (
-        <div className="mt-3 space-y-2">
-          <SelectField label="Hold for lead" value={leadId} onChange={(e) => setLeadId(e.target.value)}>
-            <option value="">Choose a lead</option>
-            {data?.leads.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </SelectField>
-          <Button variant="primary" busy={busy} disabled={!leadId} onClick={hold}>Hold unit</Button>
+      {unit.pending_booking ? <div className="mt-3"><Notice>A booking request for this flat is waiting for approval.</Notice></div> : null}
+      {unit.has_booking ? <p className="mt-3 text-[13px] text-muted">This flat has a booking record, so it keeps its buyer. Manage it from Bookings.</p> : null}
+
+      {!action && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {canBook && <Button variant="primary" onClick={() => open('book')}>Book flat</Button>}
+          {canHold && <Button onClick={() => open('hold')}>Hold flat</Button>}
+          {canChangeCustomer && <Button onClick={() => open('customer')}>{unit.lead_id ? 'Change customer' : 'Set customer'}</Button>}
+          {unit.status === 'Hold' && (can('inventory.manage') || holder) && <Button busy={busy} onClick={release}>Release hold</Button>}
         </div>
       )}
-      {unit.status === 'Hold' && (can('inventory.manage') || unit.held_by_name === user!.name) && (
-        <Button className="mt-3" busy={busy} onClick={release}>Release hold</Button>
+
+      {action && (
+        <div className="mt-4 space-y-3 border-t border-line pt-4">
+          <CustomerSearch value={customer} onChange={setCustomer} label={action === 'hold' ? 'Hold for customer' : 'Customer'} />
+          {action === 'book' && (
+            <>
+              <TextField label="Booking amount (₹ Lakhs)" type="number" step="0.01" min="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <p className="text-[13px] text-muted">{isAdmin ? 'As an admin, this books the flat at once.' : 'This goes to an approver. You cannot approve your own request.'}</p>
+            </>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setAction('')}>Back</Button>
+            {action === 'hold' && <Button variant="primary" busy={busy} disabled={!customer} onClick={hold}>Hold flat</Button>}
+            {action === 'book' && <Button variant="primary" busy={busy} disabled={!customer || !(Number(amount) > 0)} onClick={book}>{isAdmin ? 'Book now' : 'Send for approval'}</Button>}
+            {action === 'customer' && <Button variant="primary" busy={busy} disabled={!customer} onClick={setOwner}>Save customer</Button>}
+          </div>
+        </div>
       )}
     </Modal>
   );
