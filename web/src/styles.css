@@ -391,7 +391,7 @@ input[type='file']::file-selector-button {
 }
 
 /* Page sections ease in one after another. */
-.stagger > * { animation: rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.stagger > * { animation: rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 .stagger > :nth-child(2) { animation-delay: 50ms; }
 .stagger > :nth-child(3) { animation-delay: 100ms; }
 .stagger > :nth-child(4) { animation-delay: 150ms; }
@@ -403,7 +403,7 @@ input[type='file']::file-selector-button {
 main .grid > .card,
 .card > ul > li:nth-child(-n + 12),
 .card > ol > li:nth-child(-n + 12) {
-  animation: rise 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: rise 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 main .grid > .card:nth-child(2), .card > ul > li:nth-child(2), .card > ol > li:nth-child(2) { animation-delay: 35ms; }
 main .grid > .card:nth-child(3), .card > ul > li:nth-child(3), .card > ol > li:nth-child(3) { animation-delay: 70ms; }
@@ -421,17 +421,17 @@ main .grid > .card:nth-child(n + 7), .card > ul > li:nth-child(n + 7), .card > o
   80% { transform: translate3d(0, 1.5px, 0); }
   100% { transform: none; }
 }
-.dialog-backdrop { animation: backdrop-in 0.2s ease-out both; }
-.dialog { animation: sheet-up 0.34s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+.dialog-backdrop { animation: backdrop-in 0.2s ease-out backwards; }
+.dialog { animation: sheet-up 0.34s cubic-bezier(0.2, 0.9, 0.25, 1) backwards; }
 @media (min-width: 640px) {
-  .dialog { animation: spring-in 0.48s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+  .dialog { animation: spring-in 0.48s cubic-bezier(0.2, 0.9, 0.3, 1) backwards; }
 }
 
 /* Chart bars grow in one after another: each bar slides out of its own track. */
 @keyframes bar-in { from { transform: translate3d(-100%, 0, 0); } to { transform: none; } }
 .bar-track { overflow: hidden; }
-.bar-in { animation: bar-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }
-.grow-x { animation: bar-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.bar-in { animation: bar-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 70ms); }
+.grow-x { animation: bar-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 
 /* Inside a window, the placeholder shows only a few bars, not a whole page. */
 [role='dialog'] .page-skeleton { padding: 0.5rem 0; }

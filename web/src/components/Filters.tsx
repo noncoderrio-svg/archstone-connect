@@ -287,7 +287,7 @@ export function SearchBox({ value, onChange, placeholder = 'Search', label }: { 
 export function FilterBar({ search, children, activeCount = 0, onClear, shown, total, noun, trailing }: { search?: ReactNode; children?: ReactNode; activeCount?: number; onClear?: () => void; shown?: number; total?: number; noun?: string; trailing?: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="filter-bar mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2">
+    <div className="filter-bar relative z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-2">
       {search}
       {children && (
         <>
