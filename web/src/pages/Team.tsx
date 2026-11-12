@@ -110,14 +110,14 @@ function UserModal({ user, people, onClose, onPassword }: { user: any | null; pe
           <legend className="mb-1 text-[13px] font-medium">Languages</legend>
           <p className="mb-1 text-xs text-muted">Used to route WhatsApp leads. Leave blank if they speak all.</p>
           <div className="flex gap-4">{LANGUAGES.map((l) => (
-            <label key={l.code} className="flex items-center gap-1.5 text-sm"><input type="checkbox" className="accent-[#C85A1E]" checked={f.languages.includes(l.code)} onChange={(e) => setF({ ...f, languages: e.target.checked ? [...f.languages, l.code] : f.languages.filter((x) => x !== l.code) })} />{l.label}</label>
+            <label key={l.code} className="flex items-center gap-1.5 text-sm"><input type="checkbox" className="accent-[var(--brand)]" checked={f.languages.includes(l.code)} onChange={(e) => setF({ ...f, languages: e.target.checked ? [...f.languages, l.code] : f.languages.filter((x) => x !== l.code) })} />{l.label}</label>
           ))}</div>
         </fieldset>
         <fieldset>
           <legend className="mb-1 text-[13px] font-medium">Projects</legend>
           <p className="mb-1 text-xs text-muted">Site heads see only these. Telecallers receive new leads from these first.</p>
           {data?.projects.map((p: any) => (
-            <label key={p.id} className="flex items-center gap-2 py-0.5 text-sm"><input type="checkbox" className="accent-[#C85A1E]" checked={f.project_ids.includes(p.id)} onChange={() => toggle(p.id)} />{p.name}</label>
+            <label key={p.id} className="flex items-center gap-2 py-0.5 text-sm"><input type="checkbox" className="accent-[var(--brand)]" checked={f.project_ids.includes(p.id)} onChange={() => toggle(p.id)} />{p.name}</label>
           ))}
         </fieldset>
         <div className="flex justify-end gap-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" busy={busy}>{user ? 'Save' : 'Create account'}</Button></div>

@@ -1,4 +1,4 @@
-import { CalendarCheck, Clock, Flame, Phone, Sparkles } from 'lucide-react';
+import { AlarmClock, CalendarCheck, Clock, Flame, Handshake, Phone, Plus, Sparkles, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROLE_LABELS, isLeadRole, isManager } from '../../../shared/domain.ts';
@@ -7,7 +7,8 @@ import { DatePill, FilterBar, FilterPill, dateBounds, useFilters } from '../comp
 import { Page } from '../components/Layout.tsx';
 import { openAssistant } from '../components/Assistant.tsx';
 import { ConfirmErase, EraseBooking, EraseButton } from '../components/Erase.tsx';
-import { Badge, Button, Card, CardHeader, Empty, ErrorNote, PageHeader, Spinner, Stat, TempBadge } from '../components/ui.tsx';
+import { Badge, Button, Card, CardHeader, CountUp, Empty, ErrorNote, Spinner, Stat, TempBadge } from '../components/ui.tsx';
+import { AddLeadModal } from './Leads.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { dateTime, isOverdue, lakhs, timeAgo, timeOnly, ago } from '../lib/format.ts';
@@ -67,6 +68,38 @@ function Targets({ p }: { p: any }) {
   );
 }
 
+/** The greeting banner: the date, the day's key numbers, and the quick actions this person can take. */
+function Banner({ greeting, name, role, numbers, onAddLead }: { greeting: string; name: string; role: string; numbers: { label: string; value: number }[]; onAddLead?: () => void }) {
+  const { can } = useAuth();
+  const date = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long' });
+  const action = 'inline-flex h-10 items-center gap-1.5 rounded-xl bg-white/15 px-3.5 text-sm font-medium text-white ring-1 ring-white/25 transition-colors hover:bg-white/25';
+  const works = isLeadRole(role);
+  return (
+    <section className="banner mb-4 rounded-3xl px-5 py-5 shadow-[0_18px_40px_-22px_rgb(0_0_0/0.6)] sm:px-7 sm:py-6">
+      <p className="text-[13px] font-medium text-white/80">{date} · {ROLE_LABELS[role as keyof typeof ROLE_LABELS]}</p>
+      <h1 className="mt-0.5 font-display text-[28px] leading-tight font-semibold text-white sm:text-[34px]">{greeting}, {name}</h1>
+      {!!numbers.length && (
+        <dl className="mt-4 flex flex-wrap gap-x-7 gap-y-3">
+          {numbers.map((n) => (
+            <div key={n.label}>
+              <dt className="text-[12px] text-white/75">{n.label}</dt>
+              <dd className="text-2xl font-semibold text-white tabular-nums"><CountUp value={n.value} /></dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {works && <Link to="/dial" className={action}><Phone size={15} />Start calling</Link>}
+        {onAddLead && <button type="button" className={action} onClick={onAddLead}><Plus size={15} />Add lead</button>}
+        {works && <Link to="/followups" className={action}><AlarmClock size={15} />Follow-ups</Link>}
+        {can('payment.followup') && <Link to="/payments" className={action}><Wallet size={15} />Payment follow-up</Link>}
+        {can('partner.manage') && <Link to="/partners" className={action}><Handshake size={15} />Partners</Link>}
+        {can('ai.use') && <button type="button" className={action} onClick={() => openAssistant('Give me a plan for today based on my priorities.')}><Sparkles size={15} />Plan my day</button>}
+      </div>
+    </section>
+  );
+}
+
 /** Admin only: the newest bookings, with erase for mistakes. */
 function LatestBookings({ rows, onChange }: { rows: any[]; onChange: () => void }) {
   const [erasing, setErasing] = useState<number | null>(null);
@@ -115,7 +148,8 @@ function TopTelecallers({ rows }: { rows: any[] }) {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const [adding, setAdding] = useState(false);
   const { f, set, clear, activeCount } = useFilters(['date', 'from', 'to', 'project', 'owner'] as const);
   const manager = isManager(user!.role);
   const query = new URLSearchParams();
@@ -140,6 +174,16 @@ export default function Dashboard() {
   const showTeam = data.leaderboard.length > 0;
   const worker = !isManager(user!.role) && isLeadRole(user!.role);
 
+  // The day's key numbers for the banner. Payment Follow-up has no calls or visits, so sees their buyers instead.
+  const dayNumbers = user!.role === 'payment_followup'
+    ? [{ label: 'Buyers', value: data.stats.totalLeads }, { label: 'Booked this month', value: data.stats.bookedThisMonth }]
+    : [
+        { label: 'New leads today', value: data.stats.newToday },
+        { label: 'Calls today', value: data.stats.callsToday },
+        { label: 'Site visits today', value: data.visitsToday.length },
+        { label: 'Overdue follow-ups', value: data.stats.overdueTasks },
+      ];
+
   const finishTask = async (id: number) => {
     await api.post(`/tasks/${id}/complete`);
     void reload();
@@ -147,7 +191,7 @@ export default function Dashboard() {
 
   return (
     <Page>
-      <PageHeader title={`${greeting}, ${firstName}`} subtitle={`${ROLE_LABELS[user!.role]} dashboard`} />
+      <Banner greeting={greeting} name={firstName} role={user!.role} numbers={dayNumbers} onAddLead={can('lead.create') ? () => setAdding(true) : undefined} />
       {manager && (
         <FilterBar activeCount={activeCount} onClear={clear}>
           <DatePill label="Leads created" preset={f.date} from={f.from} to={f.to} onChange={(date, from, to) => set({ date, from, to })} />
@@ -300,6 +344,7 @@ export default function Dashboard() {
           </Card>
         )}
       </div>
+      {adding && <AddLeadModal onClose={() => { setAdding(false); void reload(); }} />}
     </Page>
   );
 }

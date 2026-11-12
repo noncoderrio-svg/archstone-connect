@@ -14,16 +14,19 @@
   --body: #3b4049;
   --muted: #6b7079;
   --line: #e6e3df;
-  --brand: #c85a1e;
+  --brand: #b9531b;
   --brand-strong: #a8481a;
   --brand-soft: #fcebdf;
   --brand-ink: #9a4215;
   --accent: #2f6b8a;
   --accent-soft: #e3eff5;
   --accent-ink: #1f4f68;
-  --shadow-card: 0 1px 2px rgb(27 31 39 / 5%), 0 8px 24px -16px rgb(27 31 39 / 18%);
+  --shadow-card: 0 1px 2px rgb(27 31 39 / 4%), 0 14px 34px -22px rgb(27 31 39 / 24%);
   --nav-from: #15181e;
   --nav-to: #1f232b;
+  --nav-glow: rgb(232 105 32 / 38%);
+  --banner-from: #a8481a;
+  --banner-to: #7a3412;
 }
 
 .dark {
@@ -41,9 +44,54 @@
   --accent: #6fb0d0;
   --accent-soft: #16303d;
   --accent-ink: #a9d3e7;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 10px 26px -18px rgb(0 0 0 / 70%);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 14px 30px -20px rgb(0 0 0 / 75%);
   --nav-from: #0c0e11;
   --nav-to: #15181e;
+  --nav-glow: rgb(232 105 32 / 30%);
+  --banner-from: #9a4215;
+  --banner-to: #3a1a09;
+}
+
+/* ---------- Colour themes: only the brand and menu colours change, in light and in dark. ---------- */
+:root[data-theme='teal'] {
+  --brand: #0f766e; --brand-strong: #115e59; --brand-soft: #d5f5ef; --brand-ink: #115e59;
+  --nav-from: #0b1f1e; --nav-to: #123230; --nav-glow: rgb(45 212 191 / 30%); --banner-from: #0f766e; --banner-to: #0b3b37;
+}
+.dark[data-theme='teal'] {
+  --brand: #2dd4bf; --brand-strong: #5eead4; --brand-soft: #0f2e2b; --brand-ink: #99f6e4;
+  --nav-from: #071413; --nav-to: #0d2321; --nav-glow: rgb(45 212 191 / 22%); --banner-from: #0f5f58; --banner-to: #062421;
+}
+:root[data-theme='indigo'] {
+  --brand: #4f46e5; --brand-strong: #4338ca; --brand-soft: #e5e7ff; --brand-ink: #3730a3;
+  --nav-from: #13132b; --nav-to: #1f1d4d; --nav-glow: rgb(129 140 248 / 34%); --banner-from: #4f46e5; --banner-to: #23206b;
+}
+.dark[data-theme='indigo'] {
+  --brand: #818cf8; --brand-strong: #a5b4fc; --brand-soft: #1e1b4b; --brand-ink: #c7d2fe;
+  --nav-from: #0c0c1d; --nav-to: #16153a; --nav-glow: rgb(129 140 248 / 24%); --banner-from: #3730a3; --banner-to: #141238;
+}
+:root[data-theme='emerald'] {
+  --brand: #047857; --brand-strong: #065f46; --brand-soft: #d6f7e8; --brand-ink: #065f46;
+  --nav-from: #0b1c16; --nav-to: #122b21; --nav-glow: rgb(52 211 153 / 30%); --banner-from: #047857; --banner-to: #053a2b;
+}
+.dark[data-theme='emerald'] {
+  --brand: #34d399; --brand-strong: #6ee7b7; --brand-soft: #0b2e22; --brand-ink: #a7f3d0;
+  --nav-from: #06120d; --nav-to: #0c2118; --nav-glow: rgb(52 211 153 / 22%); --banner-from: #065f46; --banner-to: #04231a;
+}
+:root[data-theme='ocean'] {
+  --brand: #1d4ed8; --brand-strong: #1e40af; --brand-soft: #dde9fe; --brand-ink: #1e3a8a;
+  --nav-from: #0d1626; --nav-to: #15233f; --nav-glow: rgb(96 165 250 / 32%); --banner-from: #1d4ed8; --banner-to: #0f2557;
+}
+.dark[data-theme='ocean'] {
+  --brand: #60a5fa; --brand-strong: #93c5fd; --brand-soft: #172554; --brand-ink: #bfdbfe;
+  --nav-from: #080e1a; --nav-to: #101b31; --nav-glow: rgb(96 165 250 / 22%); --banner-from: #1e3a8a; --banner-to: #0b1630;
+}
+:root[data-theme='plum'] {
+  --brand: #86198f; --brand-strong: #701a75; --brand-soft: #f8e6fb; --brand-ink: #701a75;
+  --nav-from: #1e0f22; --nav-to: #2f1535; --nav-glow: rgb(232 121 249 / 30%); --banner-from: #86198f; --banner-to: #3d0b42;
+}
+.dark[data-theme='plum'] {
+  --brand: #e879f9; --brand-strong: #f0abfc; --brand-soft: #3b0f3f; --brand-ink: #f5d0fe;
+  --nav-from: #140a17; --nav-to: #221026; --nav-glow: rgb(232 121 249 / 22%); --banner-from: #701a75; --banner-to: #2a0a2e;
 }
 
 @theme inline {
@@ -152,8 +200,95 @@ button:disabled {
 }
 
 .sidebar {
+  position: relative;
+  isolation: isolate;
   background: linear-gradient(180deg, var(--nav-from), var(--nav-to));
 }
+
+/* A slow glow drifts behind the menu. Only its position and opacity move. */
+.sidebar::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: -10%;
+  left: -40%;
+  width: 180%;
+  height: 55%;
+  background: radial-gradient(closest-side, var(--nav-glow), transparent);
+  pointer-events: none;
+  animation: drift 24s ease-in-out infinite alternate;
+}
+
+@keyframes drift {
+  0% { transform: translate3d(0, 0, 0); opacity: 0.9; }
+  50% { transform: translate3d(18%, 70%, 0); opacity: 0.6; }
+  100% { transform: translate3d(-10%, 130%, 0); opacity: 0.85; }
+}
+
+/* Frosted glass for the top bar, the phone tab bar and the sign-in card. */
+.frost {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+}
+
+.glass {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, #fff 35%, transparent);
+}
+
+.dark .glass {
+  border-color: color-mix(in srgb, #fff 10%, transparent);
+}
+
+/* The dashboard greeting banner, in the brand colour of the chosen theme. */
+.banner {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(120deg, var(--banner-from), var(--banner-to));
+  color: #fff;
+}
+
+.banner::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  right: -15%;
+  top: -60%;
+  width: 60%;
+  height: 220%;
+  background: radial-gradient(closest-side, rgb(255 255 255 / 18%), transparent);
+  animation: drift 30s ease-in-out infinite alternate;
+}
+
+/* Slow aurora behind the sign-in page. Blobs move; nothing is resized or recoloured while moving. */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--nav-from), var(--nav-to));
+}
+
+.aurora span {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.aurora span:nth-child(1) { background: var(--brand); top: -25vmax; left: -15vmax; animation: aurora-a 26s ease-in-out infinite alternate; }
+.aurora span:nth-child(2) { background: var(--banner-to); bottom: -30vmax; right: -20vmax; animation: aurora-b 32s ease-in-out infinite alternate; }
+.aurora span:nth-child(3) { background: var(--brand-strong); top: 30%; left: 35%; width: 35vmax; height: 35vmax; opacity: 0.35; animation: aurora-c 22s ease-in-out infinite alternate; }
+
+@keyframes aurora-a { to { transform: translate3d(25vmax, 18vmax, 0); } }
+@keyframes aurora-b { to { transform: translate3d(-22vmax, -15vmax, 0); } }
+@keyframes aurora-c { to { transform: translate3d(-18vmax, 12vmax, 0); } }
 
 main table thead tr {
   background: var(--surface-2);
@@ -163,9 +298,9 @@ main table tbody tr {
   transition: background-color 0.12s;
 }
 
-/* A pressed button should answer the finger straight away. */
+/* A pressed button should answer the finger straight away. Position only, so it stays smooth on phones. */
 button:not(:disabled):active {
-  transform: scale(0.98);
+  transform: translate3d(0, 1px, 0);
 }
 
 button {
@@ -245,12 +380,81 @@ input[type='file']::file-selector-button {
 @keyframes fade {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translate3d(0, 4px, 0);
   }
 }
 
+/* ---------- Motion. Only position and opacity animate. ---------- */
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Page sections ease in one after another. */
+.stagger > * { animation: rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.stagger > :nth-child(2) { animation-delay: 50ms; }
+.stagger > :nth-child(3) { animation-delay: 100ms; }
+.stagger > :nth-child(4) { animation-delay: 150ms; }
+.stagger > :nth-child(5) { animation-delay: 200ms; }
+.stagger > :nth-child(6) { animation-delay: 250ms; }
+.stagger > :nth-child(n + 7) { animation-delay: 300ms; }
+
+/* Cards in a grid, and the first rows of a list, follow the same rhythm. */
+main .grid > .card,
+.card > ul > li:nth-child(-n + 12),
+.card > ol > li:nth-child(-n + 12) {
+  animation: rise 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+main .grid > .card:nth-child(2), .card > ul > li:nth-child(2), .card > ol > li:nth-child(2) { animation-delay: 35ms; }
+main .grid > .card:nth-child(3), .card > ul > li:nth-child(3), .card > ol > li:nth-child(3) { animation-delay: 70ms; }
+main .grid > .card:nth-child(4), .card > ul > li:nth-child(4), .card > ol > li:nth-child(4) { animation-delay: 105ms; }
+main .grid > .card:nth-child(5), .card > ul > li:nth-child(5), .card > ol > li:nth-child(5) { animation-delay: 140ms; }
+main .grid > .card:nth-child(6), .card > ul > li:nth-child(6), .card > ol > li:nth-child(6) { animation-delay: 175ms; }
+main .grid > .card:nth-child(n + 7), .card > ul > li:nth-child(n + 7), .card > ol > li:nth-child(n + 7) { animation-delay: 210ms; }
+
+/* Windows spring open on desktop and slide up as a sheet on phones. */
+@keyframes backdrop-in { from { opacity: 0; } }
+@keyframes sheet-up { from { transform: translate3d(0, 100%, 0); } to { transform: none; } }
+@keyframes spring-in {
+  0% { opacity: 0; transform: translate3d(0, 22px, 0); }
+  55% { opacity: 1; transform: translate3d(0, -4px, 0); }
+  80% { transform: translate3d(0, 1.5px, 0); }
+  100% { transform: none; }
+}
+.dialog-backdrop { animation: backdrop-in 0.2s ease-out both; }
+.dialog { animation: sheet-up 0.34s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+@media (min-width: 640px) {
+  .dialog { animation: spring-in 0.48s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+}
+
+/* Chart bars grow in one after another: each bar slides out of its own track. */
+@keyframes bar-in { from { transform: translate3d(-100%, 0, 0); } to { transform: none; } }
+.bar-track { overflow: hidden; }
+.bar-in { animation: bar-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.grow-x { animation: bar-in 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* Inside a window, the placeholder shows only a few bars, not a whole page. */
+[role='dialog'] .page-skeleton { padding: 0.5rem 0; }
+[role='dialog'] .page-skeleton > :nth-child(-n + 2) { display: none; }
+
+/* Placeholder bars while a page loads, instead of a spinner. */
+@keyframes shimmer { 50% { opacity: 0.45; } }
+.skeleton {
+  background: var(--surface-2);
+  border-radius: 0.75rem;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.dark .skeleton { background: #262a33; }
+
+/* People who ask for less motion get none at all. */
 @media (prefers-reduced-motion: reduce) {
-  .fade-in {
-    animation: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

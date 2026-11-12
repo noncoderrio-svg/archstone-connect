@@ -196,7 +196,7 @@ function Rules({ initial }: { initial: any }) {
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
           {ROLES.filter((r) => r !== 'admin').map((r) => (
             <label key={r} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="accent-[#C85A1E]" checked={f.mask_phone_roles.includes(r)}
+              <input type="checkbox" className="accent-[var(--brand)]" checked={f.mask_phone_roles.includes(r)}
                 onChange={(e) => setF({ ...f, mask_phone_roles: e.target.checked ? [...f.mask_phone_roles, r] : f.mask_phone_roles.filter((x: string) => x !== r) })} />
               {ROLE_LABELS[r]}
             </label>
@@ -215,11 +215,11 @@ function Rules({ initial }: { initial: any }) {
       </div>
       <div className="mt-3"><TextField label="Extra pipeline stages" hint="Separate with commas." value={f.custom_stages.join(', ')} onChange={(e) => setF({ ...f, custom_stages: e.target.value.split(',').map((s: string) => s.trimStart()) })} /></div>
       <label className="mt-4 flex items-start gap-2 text-sm">
-        <input type="checkbox" className="mt-1 accent-[#C85A1E]" checked={f.enforce_call_updates} onChange={(e) => setF({ ...f, enforce_call_updates: e.target.checked })} />
+        <input type="checkbox" className="mt-1 accent-[var(--brand)]" checked={f.enforce_call_updates} onChange={(e) => setF({ ...f, enforce_call_updates: e.target.checked })} />
         <span>Require a call result before the next lead<span className="block text-xs text-muted">Staff must save each outcome in Calling.</span></span>
       </label>
       <label className="mt-2 flex items-start gap-2 text-sm">
-        <input type="checkbox" className="mt-1 accent-[#C85A1E]" checked={f.record_calls} onChange={(e) => setF({ ...f, record_calls: e.target.checked })} />
+        <input type="checkbox" className="mt-1 accent-[var(--brand)]" checked={f.record_calls} onChange={(e) => setF({ ...f, record_calls: e.target.checked })} />
         <span>Record office line calls<span className="block text-xs text-muted">Customers must be told that calls are recorded, for example by a message at the start of the call.</span></span>
       </label>
       <fieldset className="mt-4">
@@ -248,7 +248,7 @@ function ReportSchedule({ settings, runs, onSaved }: { settings: any; runs: any[
   const [s, setS] = useState(settings.report_schedule);
   const { busy, run } = useAction();
   const flag = (k: string, label: string) => (
-    <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#C85A1E]" checked={s[k]} onChange={(e) => setS({ ...s, [k]: e.target.checked })} />{label}</label>
+    <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--brand)]" checked={s[k]} onChange={(e) => setS({ ...s, [k]: e.target.checked })} />{label}</label>
   );
   const save = () => run(() => api.put('/settings', { ...settings, report_schedule: s }), 'Schedule saved');
   const sendNow = async () => { await run(() => api.post('/reports/send-now', { period: 'daily' }), 'Report sent to you'); onSaved(); };

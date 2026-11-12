@@ -87,7 +87,7 @@ function VisitModal({ lead, onClose }: { lead: any; onClose: () => void }) {
           {data?.projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </SelectField>
         <TextField label="Date and time" type="datetime-local" required value={f.when} onChange={(e) => setF({ ...f, when: e.target.value })} />
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[#C85A1E]" checked={f.pickup} onChange={(e) => setF({ ...f, pickup: e.target.checked })} />Customer needs pickup</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="accent-[var(--brand)]" checked={f.pickup} onChange={(e) => setF({ ...f, pickup: e.target.checked })} />Customer needs pickup</label>
         <p className="text-[13px] text-muted">A check-in code is sent on WhatsApp when the customer has allowed messages.</p>
         <div className="flex justify-end gap-2"><Button onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" busy={busy}>Schedule</Button></div>
       </form>

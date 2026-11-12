@@ -1,9 +1,10 @@
 import { Eye, EyeOff, LoaderCircle, TriangleAlert, X } from 'lucide-react';
 import {
-  createContext, useContext, useEffect, useId, useState, useCallback,
+  createContext, useContext, useEffect, useId, useRef, useState, useCallback,
   type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { prefersReducedMotion } from '../lib/theme.ts';
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 export { cx };
@@ -42,7 +43,7 @@ export function Button({ variant = 'secondary', size = 'md', busy, className, ch
       type="button"
       disabled={disabled || busy}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors whitespace-nowrap disabled:opacity-50',
+        'inline-flex items-center justify-center gap-1.5 rounded-xl font-medium transition-colors whitespace-nowrap disabled:opacity-50',
         size === 'sm' ? 'h-8 px-2.5 text-[13px] max-sm:h-10 max-sm:px-3' : 'h-10 px-3.5 text-sm max-sm:h-11',
         VARIANTS[variant],
         className,
@@ -71,7 +72,7 @@ export function IconButton({ label, className, children, ...rest }: ButtonHTMLAt
 
 // ---------- Layout pieces ----------
 export const Card = ({ className, children }: { className?: string; children: ReactNode }) => (
-  <section className={cx('card rounded-xl border border-line bg-surface', className)}>{children}</section>
+  <section className={cx('card rounded-2xl border border-line/80 bg-surface', className)}>{children}</section>
 );
 
 export function CardHeader({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
@@ -98,19 +99,54 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   );
 }
 
+/** A number that counts up from zero the first time it scrolls into view. Shows the final number at once for reduced motion. */
+export function CountUp({ value, duration = 800 }: { value: number; duration?: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [shown, setShown] = useState(() => (prefersReducedMotion() ? value : 0));
+  const started = useRef(false);
+  useEffect(() => {
+    if (prefersReducedMotion() || !ref.current) { setShown(value); return; }
+    let frame = 0;
+    const run = () => {
+      started.current = true;
+      const start = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / duration);
+        setShown(Math.round(value * (1 - (1 - t) ** 3)));
+        if (t < 1) frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
+    };
+    if (started.current) { setShown(value); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { io.disconnect(); run(); }
+    });
+    io.observe(ref.current);
+    return () => { io.disconnect(); cancelAnimationFrame(frame); };
+  }, [value, duration]);
+  return <span ref={ref} aria-label={String(value)}>{shown.toLocaleString('en-IN')}</span>;
+}
+
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: string; tone?: 'alert' }) {
   return (
     <Card className={cx('stat px-4 py-3.5', tone === 'alert' && 'stat-alert')}>
       <p className="text-[13px] text-muted">{label}</p>
-      <p className={cx('mt-0.5 text-[28px] leading-tight font-semibold tabular-nums', tone === 'alert' ? 'text-red-700 dark:text-red-400' : 'text-ink')}>{value}</p>
+      <p className={cx('mt-0.5 text-[28px] leading-tight font-semibold tabular-nums', tone === 'alert' ? 'text-red-700 dark:text-red-400' : 'text-ink')}>
+        {typeof value === 'number' ? <CountUp value={value} /> : value}
+      </p>
       {hint && <p className="text-[13px] text-muted">{hint}</p>}
     </Card>
   );
 }
 
+/** Placeholder bars in the shape of a page, shown while it loads. */
 export const Spinner = () => (
-  <div className="flex justify-center py-14 text-muted" role="status" aria-label="Loading">
-    <LoaderCircle className="animate-spin" />
+  <div className="page-skeleton mx-auto w-full max-w-7xl space-y-3 px-4 py-5 lg:px-6" role="status" aria-label="Loading">
+    <div className="skeleton h-8 w-56" />
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20" style={{ animationDelay: `${i * 120}ms` }} />)}
+    </div>
+    {[0, 1, 2].map((i) => <div key={i} className="skeleton h-14" style={{ animationDelay: `${i * 150}ms` }} />)}
   </div>
 );
 
@@ -210,8 +246,8 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={cx('fade-in scroll-thin max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl', wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
+    <div className="dialog-backdrop fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={cx('dialog scroll-thin max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-surface pb-[env(safe-area-inset-bottom)] shadow-2xl sm:rounded-3xl sm:pb-0', wide ? 'sm:max-w-2xl' : 'sm:max-w-md')}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
           <h2 className="text-base font-semibold">{title}</h2>
           <IconButton label="Close" onClick={onClose} className="-mr-2"><X size={18} /></IconButton>

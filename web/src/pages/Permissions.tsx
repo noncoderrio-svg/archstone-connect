@@ -33,7 +33,7 @@ export function RolePermissions() {
                   <td className="px-4 py-1.5">{label}</td>
                   {roles.map((r) => (
                     <td key={r} className="px-2 py-1.5 text-center">
-                      <input type="checkbox" aria-label={`${label} for ${ROLE_LABELS[r]}`} className="accent-[#C85A1E]"
+                      <input type="checkbox" aria-label={`${label} for ${ROLE_LABELS[r]}`} className="accent-[var(--brand)]"
                         checked={data.roles[r].includes(action)} onChange={(e) => toggle(r, action, e.target.checked)} />
                     </td>
                   ))}

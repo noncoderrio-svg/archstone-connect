@@ -6,6 +6,7 @@ import { Layout } from './components/Layout.tsx';
 import { Logo, Spinner, ToastProvider } from './components/ui.tsx';
 import { AuthProvider, useAuth } from './lib/auth.tsx';
 import './lib/install.ts';
+import './lib/theme.ts';
 import { ChangePassword, Login } from './pages/Login.tsx';
 import './styles.css';
 

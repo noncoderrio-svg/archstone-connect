@@ -37,20 +37,22 @@ function Skyline() {
   );
 }
 
+/** Sign-in pages: a slow aurora in the brand colours behind a frosted glass card. */
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden overflow-hidden bg-[#15181e] p-12 text-white lg:flex lg:flex-col lg:justify-center">
-        <div className="relative max-w-md">
+    <div className="relative grid min-h-dvh overflow-hidden lg:grid-cols-[1.1fr_1fr]">
+      <div className="aurora" aria-hidden="true"><span /><span /><span /></div>
+      <div className="relative hidden p-12 text-white lg:flex lg:flex-col lg:justify-center">
+        <div className="stagger relative max-w-md">
           <Logo variant="light" className="mb-10 w-72" />
-          <p className="text-sm tracking-widest text-[#E86920] uppercase">Real estate mandates</p>
+          <p className="text-sm tracking-widest text-white/75 uppercase">Real estate mandates</p>
           <p className="mt-4 font-display text-4xl leading-snug">{TAGLINE}</p>
         </div>
         <Skyline />
       </div>
-      <main className="flex items-center justify-center bg-surface p-6">
-        <div className="fade-in w-full max-w-sm">
-          <div className="lg:hidden"><Logo className="mx-auto mb-8 w-72 max-w-full" /></div>
+      <main className="relative flex items-center justify-center p-5 sm:p-8">
+        <div className="glass dialog w-full max-w-sm rounded-3xl p-6 shadow-2xl sm:p-8">
+          <div className="lg:hidden"><Logo className="mx-auto mb-7 w-60 max-w-full" /></div>
           {children}
         </div>
       </main>

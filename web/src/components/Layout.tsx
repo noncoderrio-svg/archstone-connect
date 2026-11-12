@@ -1,5 +1,5 @@
 import {
-  Activity, AlarmClock, Award, BadgeCheck, Bell, Building2, CalendarCheck, CalendarDays, ChartColumn, FolderOpen, Handshake, Landmark, LayoutDashboard, LogOut, Megaphone, Menu, MessageCircle, Moon, PanelLeftClose, PanelLeftOpen, Phone, ReceiptIndianRupee, Route, Search, Settings, Sparkles, Sun, Users, UserCog, Wallet, WifiOff, X,
+  Check, Palette, Activity, AlarmClock, Award, BadgeCheck, Bell, Building2, CalendarCheck, CalendarDays, ChartColumn, FolderOpen, Handshake, Landmark, LayoutDashboard, LogOut, Megaphone, Menu, MessageCircle, Moon, PanelLeftClose, PanelLeftOpen, Phone, ReceiptIndianRupee, Route, Search, Settings, Sparkles, Sun, Users, UserCog, Wallet, WifiOff, X,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FocusEvent, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -11,20 +11,21 @@ import { initials, timeAgo } from '../lib/format.ts';
 import { inAndroidApp, keepDeviceRegistered, safeLink, takeNotificationLink } from '../lib/device.ts';
 import { enableWebPush, webPushMissing } from '../lib/install.ts';
 import { useConnection } from '../lib/offline.ts';
+import { COLOR_THEMES, useColorTheme } from '../lib/theme.ts';
 import { Assistant, openAssistant } from './Assistant.tsx';
 import { CommandPalette } from './Palette.tsx';
 import { Button, IconButton, Input, Logo, cx } from './ui.tsx';
 
-type NavGroup = 'Workspace' | 'Sales' | 'Marketing' | 'Admin';
+type NavGroup = 'Daily work' | 'Sales' | 'Growth' | 'Admin';
 interface NavItem { to: string; label: string; icon: ReactNode; group: NavGroup; need?: Action; mobile?: boolean; roles?: string[] }
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={19} />, group: 'Workspace', mobile: true },
-  { to: '/dial', label: 'Calling', icon: <Phone size={19} />, group: 'Workspace', mobile: true, roles: ['admin', ...LEAD_ROLES] },
-  { to: '/leads', label: 'Leads', icon: <Users size={19} />, group: 'Workspace', mobile: true },
-  { to: '/inbox', label: 'WhatsApp Inbox', icon: <MessageCircle size={19} />, group: 'Workspace', mobile: true },
-  { to: '/followups', label: 'Follow-ups', icon: <AlarmClock size={19} />, group: 'Workspace', roles: ['admin', ...LEAD_ROLES] },
-  { to: '/performance', label: 'Performance', icon: <Award size={19} />, group: 'Workspace', roles: ['admin', ...LEAD_ROLES] },
+  { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={19} />, group: 'Daily work', mobile: true },
+  { to: '/dial', label: 'Calling', icon: <Phone size={19} />, group: 'Daily work', mobile: true, roles: ['admin', ...LEAD_ROLES] },
+  { to: '/leads', label: 'Leads', icon: <Users size={19} />, group: 'Daily work', mobile: true },
+  { to: '/inbox', label: 'WhatsApp Inbox', icon: <MessageCircle size={19} />, group: 'Daily work', mobile: true },
+  { to: '/followups', label: 'Follow-ups', icon: <AlarmClock size={19} />, group: 'Daily work', roles: ['admin', ...LEAD_ROLES] },
+  { to: '/performance', label: 'Performance', icon: <Award size={19} />, group: 'Daily work', roles: ['admin', ...LEAD_ROLES] },
   { to: '/visits', label: 'Site Visits', icon: <CalendarCheck size={19} />, group: 'Sales', mobile: true },
   { to: '/calendar', label: 'Calendar', icon: <CalendarDays size={19} />, group: 'Sales' },
   { to: '/projects', label: 'Projects & Units', icon: <Building2 size={19} />, group: 'Sales' },
@@ -32,16 +33,16 @@ const NAV: NavItem[] = [
   { to: '/approvals', label: 'Approvals', icon: <BadgeCheck size={19} />, group: 'Sales', roles: ['admin', ...CLOSING_ROLES] },
   { to: '/bookings', label: 'Bookings', icon: <ReceiptIndianRupee size={19} />, group: 'Sales', roles: [...BOOKING_ROLES] },
   { to: '/payments', label: 'Payment Follow-up', icon: <Wallet size={19} />, group: 'Sales', need: 'payment.followup' },
-  { to: '/routing', label: 'Lead Routing', icon: <Route size={19} />, group: 'Marketing', need: 'settings.manage' },
-  { to: '/campaigns', label: 'Broadcasts', icon: <Megaphone size={19} />, group: 'Marketing', need: 'campaign.create' },
-  { to: '/partners', label: 'Channel Partners', icon: <Handshake size={19} />, group: 'Marketing', need: 'partner.manage' },
-  { to: '/redevelopment', label: 'Redevelopment', icon: <Landmark size={19} />, group: 'Marketing', need: 'redevelopment.manage' },
+  { to: '/routing', label: 'Lead Routing', icon: <Route size={19} />, group: 'Growth', need: 'settings.manage' },
+  { to: '/campaigns', label: 'Broadcasts', icon: <Megaphone size={19} />, group: 'Growth', need: 'campaign.create' },
+  { to: '/partners', label: 'Channel Partners', icon: <Handshake size={19} />, group: 'Growth', need: 'partner.manage' },
+  { to: '/redevelopment', label: 'Redevelopment', icon: <Landmark size={19} />, group: 'Growth', need: 'redevelopment.manage' },
   { to: '/reports', label: 'Reports', icon: <ChartColumn size={19} />, group: 'Admin', need: 'reports.view' },
   { to: '/monitor', label: 'Monitor', icon: <Activity size={19} />, group: 'Admin', need: 'whatsapp.monitor' },
   { to: '/team', label: 'Team', icon: <UserCog size={19} />, group: 'Admin', need: 'user.manage' },
   { to: '/settings', label: 'Settings', icon: <Settings size={19} />, group: 'Admin', need: 'settings.manage' },
 ];
-const GROUPS: NavGroup[] = ['Workspace', 'Sales', 'Marketing', 'Admin'];
+const GROUPS: NavGroup[] = ['Daily work', 'Sales', 'Growth', 'Admin'];
 
 /** Desktop sidebar width choice, remembered per browser. Ctrl+B (Cmd+B on Mac) toggles it. */
 function useSidebarCollapsed() {
@@ -60,13 +61,29 @@ function useSidebarCollapsed() {
   return { collapsed, toggle: () => setCollapsed((c) => !c) };
 }
 
-function useTheme() {
-  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-    localStorage.setItem('theme', dark ? 'dark' : 'light');
-  }, [dark]);
-  return { dark, toggle: () => setDark((d) => !d) };
+/** Colour theme picker in the top bar. Each theme changes only the brand and menu colours, and is saved on this device. */
+function ThemePicker({ theme, onPick }: { theme: string; onPick: (t: any) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <IconButton label="Colour theme" onClick={() => setOpen((o) => !o)} aria-expanded={open}><Palette size={19} /></IconButton>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="dialog absolute right-0 z-40 mt-1 w-52 rounded-2xl border border-line bg-surface p-1.5 shadow-xl" role="menu" aria-label="Colour theme">
+            {COLOR_THEMES.map((t) => (
+              <button key={t.key} type="button" role="menuitemradio" aria-checked={theme === t.key} onClick={() => { onPick(t.key); setOpen(false); }}
+                className={cx('flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm hover:bg-surface-2', theme === t.key && 'bg-surface-2 font-medium text-ink')}>
+                <span className="size-5 shrink-0 rounded-full ring-2 ring-white/70 dark:ring-black/30" style={{ background: t.swatch }} />
+                <span className="flex-1">{t.label}</span>
+                {theme === t.key && <Check size={15} className="text-brand-ink" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 /** Label that floats beside an icon in the collapsed sidebar. Fixed position so the scrolling nav cannot clip it. */
@@ -94,7 +111,7 @@ function Sidebar({ items, onNavigate, collapsed = false, onToggle }: { items: Na
   const overdue = followUps?.overdue ?? 0;
   const groups = GROUPS.map((g) => [g, items.filter((i) => i.group === g)] as const).filter(([, list]) => list.length);
   return (
-    <div className="sidebar flex h-full flex-col text-slate-300">
+    <div className="sidebar flex h-full flex-col overflow-hidden text-slate-300 lg:rounded-3xl lg:shadow-[0_18px_40px_-18px_rgb(0_0_0/0.55)] lg:ring-1 lg:ring-white/5">
       <div className={cx('flex items-start', collapsed ? 'flex-col items-center gap-2 px-2 pt-4 pb-3' : 'justify-between px-5 pt-5 pb-4')}>
         <Link to="/" onClick={onNavigate} className="block min-w-0" aria-label="Archstone Connect home" {...bind('Dashboard')}>
           {collapsed
@@ -113,7 +130,7 @@ function Sidebar({ items, onNavigate, collapsed = false, onToggle }: { items: Na
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-expanded={!collapsed}
             title={`${collapsed ? 'Expand' : 'Collapse'} sidebar (Ctrl+B)`}
-            className={cx('flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-[#E86920] focus-visible:outline-none', !collapsed && '-mr-2')}
+            className={cx('flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none', !collapsed && '-mr-2')}
           >
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
@@ -124,7 +141,7 @@ function Sidebar({ items, onNavigate, collapsed = false, onToggle }: { items: Na
           <div key={group} className={cx(gi > 0 && 'mt-3')}>
             {collapsed
               ? gi > 0 && <div className="mx-auto mb-3 h-px w-8 bg-white/10" aria-hidden="true" />
-              : <p className="px-3 pb-1.5 text-[10.5px] font-semibold tracking-[0.18em] text-slate-500 uppercase">{group}</p>}
+              : <p className="px-3 pb-1.5 text-[10.5px] font-semibold tracking-[0.18em] text-slate-400 uppercase">{group}</p>}
             <div className="space-y-0.5">
               {list.map((item) => (
                 <NavLink
@@ -136,16 +153,15 @@ function Sidebar({ items, onNavigate, collapsed = false, onToggle }: { items: Na
                   {...bind(item.label + (item.to === '/followups' && overdue ? ` · ${overdue} overdue` : ''))}
                   className={({ isActive }) =>
                     cx(
-                      'group relative flex h-10 items-center rounded-lg text-sm transition-all duration-150',
+                      'group relative flex h-10 items-center rounded-xl text-sm transition-colors duration-150',
                       collapsed ? 'justify-center' : 'gap-3 px-3',
-                      isActive ? 'bg-white/12 font-medium text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]' : 'hover:bg-white/8 hover:text-white',
+                      isActive ? 'bg-white font-semibold text-slate-900 shadow-[0_6px_16px_-8px_rgb(0_0_0/0.6)]' : 'hover:bg-white/8 hover:text-white',
                     )
                   }
                 >
                   {({ isActive }) => (
                     <>
-                      {isActive && <span className="absolute top-2 bottom-2 left-0 w-[3px] rounded-r-full bg-[#E86920]" aria-hidden="true" />}
-                      <span className={cx('relative shrink-0 transition-transform duration-150 group-hover:scale-110', isActive && 'text-[#F28A4C]')}>
+                      <span className={cx('relative shrink-0 transition-transform duration-150 group-hover:translate-x-0.5', isActive && 'text-[var(--brand-strong)] dark:text-[var(--banner-from)]')}>
                         {item.icon}
                         {collapsed && item.to === '/followups' && overdue > 0 && (
                           <span className="absolute -top-1 -right-1.5 size-2.5 rounded-full bg-red-600 ring-2 ring-[#1B1F27]" aria-hidden="true" />
@@ -165,7 +181,7 @@ function Sidebar({ items, onNavigate, collapsed = false, onToggle }: { items: Na
       </nav>
       <div className={cx('flex items-center border-t border-white/10 py-3', collapsed ? 'flex-col gap-2 px-2' : 'gap-2.5 px-3.5')}>
         <Link to="/account" onClick={onNavigate} className={cx('flex min-w-0 items-center gap-2.5 rounded-lg hover:opacity-85', !collapsed && 'flex-1')} aria-label="My Account" {...bind(`${user?.name ?? 'My Account'}${user ? ` · ${ROLE_LABELS[user.role]}` : ''}`)}>
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#E86920] text-[13px] font-semibold text-white">{initials(user?.name ?? '')}</span>
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--banner-from)] text-[13px] font-semibold text-white ring-2 ring-white/15">{initials(user?.name ?? '')}</span>
           {!collapsed && (
             <span className="min-w-0">
               <span className="block truncate text-sm font-medium text-white">{user?.name}</span>
@@ -304,7 +320,7 @@ function Notifications() {
 
 export function Layout() {
   const { can, user, demoMode, whatsappLive } = useAuth();
-  const { dark, toggle } = useTheme();
+  const { theme, setTheme, dark, toggleDark: toggle } = useColorTheme();
   const sidebar = useSidebarCollapsed();
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -330,13 +346,13 @@ export function Layout() {
 
   return (
     <div className="flex h-dvh">
-      <aside className={cx('hidden shrink-0 overflow-hidden transition-[width] duration-200 ease-out lg:block', sidebar.collapsed ? 'w-[72px]' : 'w-60')}>
+      <aside className={cx('hidden shrink-0 py-3 pl-3 transition-[width] duration-200 ease-out lg:block', sidebar.collapsed ? 'w-[84px]' : 'w-64')}>
         <Sidebar items={items} collapsed={sidebar.collapsed} onToggle={sidebar.toggle} />
       </aside>
       {menuOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="absolute inset-0 bg-slate-950/50" onClick={() => setMenuOpen(false)} />
-          <div className="fade-in relative h-full w-64"><Sidebar items={items} onNavigate={() => setMenuOpen(false)} /></div>
+          <div className="dialog relative h-full w-64 overflow-hidden rounded-r-3xl"><Sidebar items={items} onNavigate={() => setMenuOpen(false)} /></div>
           <IconButton label="Close menu" className="absolute top-3 right-3 bg-surface" onClick={() => setMenuOpen(false)}><X size={18} /></IconButton>
         </div>
       )}
@@ -353,7 +369,7 @@ export function Layout() {
               : `You are offline. Showing saved data.${pending ? ` ${pending} update${pending > 1 ? 's' : ''} will send when you reconnect.` : ''}`}
           </p>
         )}
-        <header className="flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line bg-surface px-2 pt-[env(safe-area-inset-top)] sm:gap-2 sm:px-3 lg:px-5">
+        <header className="frost relative z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line/70 px-2 pt-[env(safe-area-inset-top)] sm:gap-2 sm:px-3 lg:px-5">
           <IconButton label="Open menu" className="lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={20} /></IconButton>          <span className="font-display text-base font-semibold text-ink sm:hidden">Archstone Connect</span>
           <form onSubmit={search} role="search" className="relative hidden max-w-md flex-1 sm:block">
             <Search size={16} className="absolute top-2.5 left-3 text-muted" />
@@ -361,24 +377,30 @@ export function Layout() {
           </form>
           <div className="flex-1" />
           {can('ai.use') && <IconButton label="Open AI assistant" className="text-brand-ink lg:hidden" onClick={() => openAssistant()}><Sparkles size={19} /></IconButton>}
-          <IconButton label={dark ? 'Use light theme' : 'Use dark theme'} onClick={toggle}>{dark ? <Sun size={19} /> : <Moon size={19} />}</IconButton>
+          <ThemePicker theme={theme} onPick={setTheme} />
+          <IconButton label={dark ? 'Use light mode' : 'Use dark mode'} onClick={toggle}>{dark ? <Sun size={19} /> : <Moon size={19} />}</IconButton>
           <Notifications />
         </header>
         <main className="scroll-thin min-h-0 flex-1 overflow-y-auto"><div key={location.pathname.split('/')[1]} className="fade-in h-full"><Outlet /></div></main>
         {/* A chat needs the whole screen for its messages and reply box. */}
         {!/^\/inbox\/\d+/.test(location.pathname) && (
-          <nav className="grid shrink-0 auto-cols-fr grid-flow-col border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Quick">
-            {items.filter((i) => i.mobile).map((i) => (
-              <NavLink key={i.to} to={i.to} end={i.to === '/'} className={({ isActive }) => cx('flex h-14 flex-col items-center justify-center gap-0.5 text-[11px]', isActive ? 'font-semibold text-brand-ink' : 'text-muted')}>
-                {({ isActive }) => (
-                  <>
-                    <span className={cx('flex h-7 w-12 items-center justify-center rounded-full transition-colors', isActive && 'bg-brand-soft')}>{i.icon}</span>
-                    {i.label.replace('WhatsApp ', '').replace('Site ', '')}
-                  </>
-                )}
-              </NavLink>
-            ))}
-          </nav>
+          <div className="shrink-0 px-3 pt-1 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] lg:hidden">
+            <nav className="frost grid auto-cols-fr grid-flow-col gap-1 rounded-[1.4rem] p-1.5 shadow-[0_10px_30px_-12px_rgb(0_0_0/0.35)] ring-1 ring-line" aria-label="Quick">
+              {items.filter((i) => i.mobile).map((i) => (
+                <NavLink key={i.to} to={i.to} end={i.to === '/'} className={({ isActive }) => cx(
+                  'flex h-12 min-w-0 items-center justify-center gap-1.5 rounded-2xl px-2 text-[12px] transition-colors',
+                  isActive ? 'bg-brand font-semibold text-white shadow-sm dark:text-slate-950' : 'flex-col gap-0.5 text-muted hover:text-ink',
+                )}>
+                  {({ isActive }) => (
+                    <>
+                      <span className="shrink-0">{i.icon}</span>
+                      <span className={cx('truncate', !isActive && 'text-[10.5px]')}>{i.label.replace('WhatsApp ', '').replace('Site ', '')}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
         )}
       </div>
       <Assistant />
@@ -387,4 +409,4 @@ export function Layout() {
   );
 }
 
-export const Page = ({ children }: { children: ReactNode }) => <div className="mx-auto max-w-7xl px-4 py-4 pb-8 lg:px-6 lg:py-5">{children}</div>;
+export const Page = ({ children }: { children: ReactNode }) => <div className="stagger mx-auto max-w-7xl px-4 py-4 pb-8 lg:px-6 lg:py-5">{children}</div>;

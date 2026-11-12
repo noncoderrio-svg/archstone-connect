@@ -49,7 +49,7 @@ export function AddLeadModal({ onClose }: { onClose: () => void }) {
         </SelectField>
         <TextareaField label="Notes" value={f.notes} onChange={(e) => set('notes', e.target.value)} />
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-1 accent-[#C85A1E]" checked={f.wa_opt_in} onChange={(e) => set('wa_opt_in', e.target.checked)} />
+          <input type="checkbox" className="mt-1 accent-[var(--brand)]" checked={f.wa_opt_in} onChange={(e) => set('wa_opt_in', e.target.checked)} />
           <span>Customer agreed to receive WhatsApp updates</span>
         </label>
         <div className="flex justify-end gap-2 pt-1">
@@ -363,7 +363,7 @@ export default function Leads() {
                     <tr className="border-b border-line text-left text-[13px] text-muted">
                       {can('lead.reassign') && (
                         <th className="w-10 pl-4">
-                          <input type="checkbox" aria-label="Select all on page" className="accent-[#C85A1E]"
+                          <input type="checkbox" aria-label="Select all on page" className="accent-[var(--brand)]"
                             checked={allOnPage.length > 0 && allOnPage.every((id: number) => selected.includes(id))}
                             onChange={(e) => setSelected(e.target.checked ? allOnPage : [])} />
                         </th>
@@ -376,7 +376,7 @@ export default function Leads() {
                       <tr key={l.id} className="hover:bg-surface-2">
                         {can('lead.reassign') && (
                           <td className="pl-4">
-                            <input type="checkbox" aria-label={`Select ${l.name}`} className="accent-[#C85A1E]" checked={selected.includes(l.id)}
+                            <input type="checkbox" aria-label={`Select ${l.name}`} className="accent-[var(--brand)]" checked={selected.includes(l.id)}
                               onChange={(e) => setSelected((s) => (e.target.checked ? [...s, l.id] : s.filter((x) => x !== l.id)))} />
                           </td>
                         )}
