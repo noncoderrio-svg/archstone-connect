@@ -1,3 +1,4 @@
+import { syncTemplateStatuses } from './whatsapp.ts';
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { config } from '../config.ts';
@@ -313,6 +314,7 @@ export async function tick() {
   await runIdleWorkflows();
   void syncMetaLeads().catch((e) => console.error('Meta pull failed:', e.message));
   void sendFeedback().catch((e) => console.error('Meta feedback failed:', e.message));
+  void checkPendingTemplates().catch((e) => console.error('Template status check failed:', e.message));
   await sendVisitReminders();
   await sendPaymentReminders();
   await sendFollowUpDrips();
@@ -324,6 +326,15 @@ export async function tick() {
 }
 
 let running = false;
+
+/** While a template waits for Meta's review, asks Meta every 15 minutes, in case its webhook does not arrive. */
+async function checkPendingTemplates() {
+  if (!get('SELECT 1 AS x FROM wa_templates WHERE status = ? LIMIT 1', 'pending')) return;
+  const last = getSetting<string>('template_sync_last', '');
+  if (last && last > minutesFromNow(-15)) return;
+  setSetting('template_sync_last', nowIso());
+  await syncTemplateStatuses();
+}
 
 /** Runs one pass of the scheduled jobs, never two at once. Returns false if a pass was already running. */
 export async function tickOnce() {

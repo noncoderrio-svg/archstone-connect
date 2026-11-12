@@ -15,6 +15,7 @@ import { growth } from './routes/growth.ts';
 import { partners } from './routes/partners.ts';
 import { payments } from './routes/payments.ts';
 import { erase } from './routes/erase.ts';
+import { legal } from './routes/legal.ts';
 import { insights } from './routes/insights.ts';
 import { messaging } from './routes/messaging.ts';
 import { postsales, publicBuyer } from './routes/postsales.ts';
@@ -65,6 +66,7 @@ export function createApp() {
   });
 
   app.use('/webhooks', rateLimit(300), webhooks);
+  app.use(legal);
   // Hosts that pause idle apps (such as shared Node.js hosting) call this from a cron job every minute.
   app.get('/cron/tick', rateLimit(30), async (req, res, next) => {
     const token = String(req.query.token ?? req.get('x-cron-token') ?? '');

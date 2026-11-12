@@ -7,9 +7,7 @@ import { config, whatsappLive } from '../config.ts';
 import { all, get, nowIso, run } from '../db.ts';
 import { audit, broadcast, leadScope, notify, phoneMasked, maskPhone, visibleLead, workableLead } from '../services/core.ts';
 import { clauseSql, leadFilters } from '../services/filters.ts';
-import {
-  audiencePreview, creatorLeadIds, queueCampaign, receiveInbound, sendBlockers, sendDocument, sendTemplate, sendText, submitTemplate, templateVars, windowOpen,
-} from '../services/whatsapp.ts';
+import { audiencePreview, creatorLeadIds, queueCampaign, receiveInbound, sendBlockers, sendDocument, sendTemplate, sendText, submitTemplate, templateVars, windowOpen, syncTemplateStatuses } from '../services/whatsapp.ts';
 
 export const messaging = Router();
 
@@ -184,6 +182,13 @@ messaging.put('/templates/:id', requirePermission('template.manage'), (req, res)
   audit(req, 'template.update', 'template', t.id, b.name);
   broadcast('templates');
   res.json({ ok: true });
+});
+
+/** "Check status with Meta": pulls each submitted template's review result. */
+messaging.post('/templates/sync', requirePermission('template.manage'), async (req, res) => {
+  const result = await syncTemplateStatuses();
+  audit(req, 'template.sync', 'template', '', `${result.changed} changed of ${result.checked}`);
+  res.json(result);
 });
 
 messaging.post('/templates/:id/submit', requirePermission('template.manage'), async (req, res) => {

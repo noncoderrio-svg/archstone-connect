@@ -1,10 +1,10 @@
-import { FileImage, Plus, Send, Sparkles, Trash2 } from 'lucide-react';
+import { FileImage, Plus, RefreshCw, Send, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { SOURCES, STAGES } from '../../../shared/domain.ts';
 import { DatePill, FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import {
-  Badge, Button, Card, Empty, ErrorNote, IconButton, Input, Modal, Notice, PageHeader, Select, SelectField, Spinner, TextField, TextareaField, cx, useAction,
+  Badge, Button, Card, Empty, ErrorNote, IconButton, Input, Modal, Notice, PageHeader, Select, SelectField, Spinner, TextField, TextareaField, cx, useAction, useToast,
 } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -208,12 +208,17 @@ function Templates() {
   const { can, whatsappLive } = useAuth();
   const { data, reload } = useApi('/templates', ['templates']);
   const [editing, setEditing] = useState<any | 'new' | null>(null);
-  const { run } = useAction();
+  const { busy, run } = useAction();
+  const toast = useToast();
   const { f, set, clear, activeCount } = useFilters(['q', 'status', 'category', 'language'] as const, { prefix: 't_' });
   const manage = can('template.manage');
   const submit = async (id: number) => {
     await run(() => api.post(`/templates/${id}/submit`), whatsappLive ? 'Sent to Meta for approval' : 'Approved (simulated in demo mode)');
     void reload();
+  };
+  const checkStatus = async () => {
+    const r = await run(() => api.post('/templates/sync'));
+    if (r) { toast(r.simulated ? 'Demo mode: nothing to check' : r.changed ? `${r.changed} template${r.changed > 1 ? 's' : ''} updated from Meta` : 'Already up to date with Meta'); void reload(); }
   };
   if (!data) return <Spinner />;
   const rows = filterRows<any>(data.templates, f, {
@@ -222,7 +227,12 @@ function Templates() {
   });
   return (
     <>
-      {manage && <div className="mb-3 flex justify-end"><Button variant="primary" onClick={() => setEditing('new')}><Plus size={16} />New template</Button></div>}
+      {manage && (
+        <div className="mb-3 flex flex-wrap justify-end gap-2">
+          {whatsappLive && <Button busy={busy} onClick={checkStatus}><RefreshCw size={15} />Check status with Meta</Button>}
+          <Button variant="primary" onClick={() => setEditing('new')}><Plus size={16} />New template</Button>
+        </div>
+      )}
       <FilterBar search={<SearchBox placeholder="Search templates" value={f.q} onChange={(q) => set({ q })} />} activeCount={activeCount} onClear={clear} shown={rows.length} total={data.templates.length} noun="templates">
         <FilterPill label="Status" value={f.status} options={optionsFrom<any>(data.templates, (t) => t.status)} onChange={(status) => set({ status })} />
         <FilterPill label="Category" value={f.category} options={optionsFrom<any>(data.templates, (t) => t.category)} onChange={(category) => set({ category })} />

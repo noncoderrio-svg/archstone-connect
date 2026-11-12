@@ -714,3 +714,34 @@ export async function processQueue(limit = 40) {
   if (batch.length) broadcast('campaigns');
   return batch.length;
 }
+
+/**
+ * Reads each template's review status straight from Meta. Approvals normally arrive by webhook,
+ * but Meta holds webhooks back while an app is unpublished, so this keeps Archstone up to date either way.
+ * Only templates Archstone knows by name are touched. Returns how many changed.
+ */
+export async function syncTemplateStatuses() {
+  if (!whatsappLive() || !config.whatsapp.businessAccountId) return { checked: 0, changed: 0, simulated: true };
+  const found: any[] = [];
+  let url: string | null = `https://graph.facebook.com/${config.whatsapp.apiVersion}/${config.whatsapp.businessAccountId}/message_templates?fields=name,status,rejected_reason,language&limit=200`;
+  for (let page = 0; url && page < 10; page++) {
+    const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${config.whatsapp.token}` } });
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok) throw new HttpError(502, data?.error?.message ?? 'Meta did not return the templates.');
+    found.push(...(data.data ?? []));
+    url = data.paging?.next ?? null;
+  }
+  const MAP: Record<string, string> = { APPROVED: 'approved', REJECTED: 'rejected', PENDING: 'pending', IN_APPEAL: 'pending' };
+  let changed = 0;
+  for (const t of found) {
+    const status = MAP[String(t.status)];
+    if (!status) continue;
+    const reason = status === 'rejected' && t.rejected_reason && t.rejected_reason !== 'NONE' ? String(t.rejected_reason) : '';
+    changed += run(
+      `UPDATE wa_templates SET status = ?, reject_reason = ? WHERE name = ? AND status != 'draft' AND (status != ? OR reject_reason != ?)`,
+      status, reason, String(t.name), status, reason,
+    ).changes;
+  }
+  if (changed) broadcast('templates');
+  return { checked: found.length, changed, simulated: false };
+}

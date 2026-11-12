@@ -15,6 +15,8 @@ export const config = {
   demoMode: env('DEMO_MODE', 'true') === 'true',
   initialAdminEmail: env('INITIAL_ADMIN_EMAIL').toLowerCase(),
   websiteApiKey: env('WEBSITE_API_KEY'),
+  /** Shown on the public privacy and data deletion pages. */
+  privacyContactEmail: env('PRIVACY_CONTACT_EMAIL'),
   /** Secret for /cron/tick, which a host's cron job calls to run reminders and backups. Empty turns the link off. */
   cronToken: env('CRON_TOKEN'),
   whatsapp: {
