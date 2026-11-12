@@ -1,5 +1,5 @@
 import {
-  Activity, AlarmClock, Award, BadgeCheck, Bell, Building2, CalendarCheck, CalendarDays, ChartColumn, FolderOpen, Handshake, Landmark, LayoutDashboard, LogOut, Megaphone, Menu, MessageCircle, Moon, PanelLeftClose, PanelLeftOpen, Phone, ReceiptIndianRupee, Route, Search, Settings, Sparkles, Sun, Users, UserCog, WifiOff, X,
+  Activity, AlarmClock, Award, BadgeCheck, Bell, Building2, CalendarCheck, CalendarDays, ChartColumn, FolderOpen, Handshake, Landmark, LayoutDashboard, LogOut, Megaphone, Menu, MessageCircle, Moon, PanelLeftClose, PanelLeftOpen, Phone, ReceiptIndianRupee, Route, Search, Settings, Sparkles, Sun, Users, UserCog, Wallet, WifiOff, X,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FocusEvent, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -31,6 +31,7 @@ const NAV: NavItem[] = [
   { to: '/files', label: 'Property Files', icon: <FolderOpen size={19} />, group: 'Sales' },
   { to: '/approvals', label: 'Approvals', icon: <BadgeCheck size={19} />, group: 'Sales', roles: ['admin', ...CLOSING_ROLES] },
   { to: '/bookings', label: 'Bookings', icon: <ReceiptIndianRupee size={19} />, group: 'Sales', roles: [...BOOKING_ROLES] },
+  { to: '/payments', label: 'Payment Follow-up', icon: <Wallet size={19} />, group: 'Sales', need: 'payment.followup' },
   { to: '/routing', label: 'Lead Routing', icon: <Route size={19} />, group: 'Marketing', need: 'settings.manage' },
   { to: '/campaigns', label: 'Broadcasts', icon: <Megaphone size={19} />, group: 'Marketing', need: 'campaign.create' },
   { to: '/partners', label: 'Channel Partners', icon: <Handshake size={19} />, group: 'Marketing', need: 'partner.manage' },

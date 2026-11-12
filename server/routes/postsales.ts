@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import express, { Router } from 'express';
 import { z } from 'zod';
-import { BOOKING_ROLES, DOCUMENT_TYPES, HANDOVER_STAGES } from '../../shared/domain.ts';
+import { BOOKING_ROLES, DOCUMENT_TYPES, HANDOVER_STAGES, RECEIPT_PREFIX } from '../../shared/domain.ts';
 import { HttpError, requirePermission, type SessionUser } from '../auth.ts';
 import { config } from '../config.ts';
 import { all, get, getSetting, nowIso, run, tx } from '../db.ts';
@@ -115,7 +115,7 @@ postsales.get('/bookings', (req, res) => {
   });
 });
 
-function visibleBooking(user: SessionUser, id: number) {
+export function visibleBooking(user: SessionUser, id: number) {
   bookingScope(user);
   const b = get<any>('SELECT * FROM bookings WHERE id = ?', id);
   if (!b) throw new HttpError(404, 'Booking not found.');
@@ -159,7 +159,7 @@ postsales.put('/bookings/:id/schedule', requirePermission('booking.manage'), (re
   res.json({ ok: true });
 });
 
-postsales.post('/payments/:id/paid', requirePermission('booking.manage'), (req, res) => {
+postsales.post('/payments/:id/paid', requirePermission('payment.record'), (req, res) => {
   const p = get<any>('SELECT * FROM payments WHERE id = ?', Number(req.params.id));
   if (!p) throw new HttpError(404, 'Payment not found.');
   const b = visibleBooking(req.user, p.booking_id);
@@ -167,8 +167,8 @@ postsales.post('/payments/:id/paid', requirePermission('booking.manage'), (req, 
   const { reference } = z.object({ reference: z.string().trim().min(3, 'Enter the cheque or transaction reference.').max(80) }).parse(req.body);
   const receipt = tx(() => {
     const year = nowIso().slice(0, 4);
-    const count = get<{ n: number }>(`SELECT COUNT(*) n FROM payments WHERE receipt_number LIKE ?`, `EG-${year}-%`)!.n;
-    const number = `EG-${year}-${String(count + 1).padStart(5, '0')}`;
+    const count = get<{ n: number }>(`SELECT COUNT(*) n FROM payments WHERE receipt_number LIKE ?`, `${RECEIPT_PREFIX}-${year}-%`)!.n;
+    const number = `${RECEIPT_PREFIX}-${year}-${String(count + 1).padStart(5, '0')}`;
     run('UPDATE payments SET paid_at = ?, reference = ?, receipt_number = ?, recorded_by = ? WHERE id = ?', nowIso(), reference, number, req.user.id, p.id);
     logActivity(b.lead_id, 'payment', `Payment received: ${p.label}`, `₹${p.amount_lakhs} Lakhs. Receipt ${number}`, req.user.id);
     return number;

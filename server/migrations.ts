@@ -67,7 +67,10 @@ export function addNewPermissions() {
     const saved = getSetting<Partial<Record<Role, Action[]>>>('role_permissions', {});
     for (const role of Object.keys(saved) as Role[]) {
       const set = new Set(saved[role]);
-      for (const step of pending) for (const a of step.actions) if (PERMISSIONS[role]?.includes(a)) set.add(a);
+      for (const step of pending) {
+        if (step.when && !set.has(step.when)) continue;
+        for (const a of step.actions) if (PERMISSIONS[role]?.includes(a)) set.add(a);
+      }
       saved[role] = [...set];
     }
     if (Object.keys(saved).length) setSetting('role_permissions', saved);

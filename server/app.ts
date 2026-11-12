@@ -13,6 +13,7 @@ import { crm } from './routes/crm.ts';
 import { dialer } from './routes/dialer.ts';
 import { growth } from './routes/growth.ts';
 import { partners } from './routes/partners.ts';
+import { payments } from './routes/payments.ts';
 import { insights } from './routes/insights.ts';
 import { messaging } from './routes/messaging.ts';
 import { postsales, publicBuyer } from './routes/postsales.ts';
@@ -76,7 +77,7 @@ export function createApp() {
   });
   app.use('/api', rateLimit(1200), publicAuth, publicGoogle);
   app.use('/public', rateLimit(600), publicMedia, publicBuyer);
-  app.use('/api', requireAuth, admin, control, insights, dialer, account, postsales, partners, growth, routing, crm, sales, messaging);
+  app.use('/api', requireAuth, admin, control, insights, dialer, account, postsales, payments, partners, growth, routing, crm, sales, messaging);
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found.')));
 
   const dist = resolve('dist');

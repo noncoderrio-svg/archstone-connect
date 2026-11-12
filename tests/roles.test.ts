@@ -134,3 +134,13 @@ test('permissions added later reach saved role sets once, by their defaults', as
   addNewPermissions();
   assert.deepEqual(db.getSetting('role_permissions', {}).closing_manager, ['lead.create']);
 });
+
+test('payment permissions reach a saved role set only if it could already manage bookings', async () => {
+  const { addNewPermissions } = await import('../server/migrations.ts');
+  db.setSetting('permissions_version', 3);
+  db.setSetting('role_permissions', { sourcing_manager: ['booking.manage'], site_head: ['lead.create'] });
+  addNewPermissions();
+  const saved = db.getSetting('role_permissions', {});
+  assert.deepEqual(saved.sourcing_manager.sort(), ['booking.manage', 'payment.followup', 'payment.record']);
+  assert.deepEqual(saved.site_head, ['lead.create'], 'an admin had taken bookings away, so payments stay away too');
+});

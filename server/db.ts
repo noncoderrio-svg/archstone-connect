@@ -539,6 +539,16 @@ CREATE TABLE IF NOT EXISTS partner_contacts (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_partner_contacts ON partner_contacts(partner_id);
+CREATE TABLE IF NOT EXISTS payment_followups (
+  id INTEGER PRIMARY KEY,
+  payment_id INTEGER NOT NULL REFERENCES payments(id),
+  user_id INTEGER REFERENCES users(id),
+  outcome TEXT NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  promised_on TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_payment_followups ON payment_followups(payment_id);
 `);
 
 type Row = Record<string, any>;

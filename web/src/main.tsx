@@ -30,6 +30,7 @@ const Dialer = lazyPage(() => import('./pages/Dialer.tsx'));
 const Media = lazyPage(() => import('./pages/Media.tsx'));
 const Monitor = lazyPage(() => import('./pages/Monitor.tsx'));
 const Bookings = lazyPage(() => import('./pages/Bookings.tsx'));
+const Payments = lazyPage(() => import('./pages/Payments.tsx'));
 const Receipt = lazyPage(() => import('./pages/Bookings.tsx').then((m) => ({ default: m.Receipt })));
 const CostSheet = lazyPage(() => import('./pages/CostSheet.tsx'));
 const Partners = lazyPage(() => import('./pages/Partners.tsx'));
@@ -93,6 +94,7 @@ function Root() {
           <Route path="files" element={<Lazy><Media /></Lazy>} />
           <Route path="monitor" element={<Lazy><Monitor /></Lazy>} />
           <Route path="bookings" element={<Lazy><Bookings /></Lazy>} />
+          <Route path="payments" element={<Lazy><Payments /></Lazy>} />
           <Route path="partners" element={<Lazy><Partners /></Lazy>} />
           <Route path="redevelopment" element={<Lazy><Redevelopment /></Lazy>} />
           <Route path="*" element={<Navigate to="/" replace />} />

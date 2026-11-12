@@ -400,7 +400,7 @@ test('payment schedule must match the booking, receipts are unique, and reminder
   const first = detail.payments[0];
   assert.equal((await users.sales1.post(`/api/payments/${first.id}/paid`, { reference: 'UTR1' })).status, 403);
   const paid = await users.head.post(`/api/payments/${first.id}/paid`, { reference: 'UTR12345' });
-  assert.match(paid.data.receipt_number, /^EG-\d{4}-\d{5}$/);
+  assert.match(paid.data.receipt_number, /^AS-\d{4}-\d{5}$/);
   assert.equal((await users.head.post(`/api/payments/${first.id}/paid`, { reference: 'UTR12345' })).status, 409);
 
   const reschedule = await users.head.put(`/api/bookings/${booking.id}/schedule`, { items: [{ label: 'Rest', due_date: later, amount_lakhs: 90 }] });

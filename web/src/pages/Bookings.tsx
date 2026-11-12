@@ -108,7 +108,7 @@ function BookingModal({ id, onClose }: { id: number; onClose: () => void }) {
             <span className="font-medium text-ink tabular-nums">{lakhs(p.amount_lakhs)}</span>
             {p.paid_at
               ? <Link to={`/bookings/${id}/receipt/${p.id}`} target="_blank"><Button size="sm"><Printer size={14} />{p.receipt_number}</Button></Link>
-              : manage && <Button size="sm" variant="primary" onClick={() => setPaying(p)}>Record payment</Button>}
+              : can('payment.record') && booking.status === 'active' && <Button size="sm" variant="primary" onClick={() => setPaying(p)}>Record payment</Button>}
           </li>
         ))}
       </ul>

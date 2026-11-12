@@ -208,7 +208,9 @@ export const PERMISSION_GROUPS = [
       ['unit.book', 'Book a flat'],
       ['inventory.manage', 'Manage units'],
       ['approval.review', 'Approve bookings and discounts'],
-      ['booking.manage', 'Manage bookings and payments'],
+      ['booking.manage', 'Manage bookings and payment schedules'],
+      ['payment.record', 'Record payments received'],
+      ['payment.followup', 'Log payment follow-ups'],
       ['partner.manage', 'Manage channel partners'],
       ['redevelopment.manage', 'Manage redevelopment deals'],
     ],
@@ -239,17 +241,27 @@ const EVERYONE: Action[] = ['lead.create', 'whatsapp.send', 'campaign.create', '
 /** Starting points. An admin can change any of these, by role or for one person. */
 export const PERMISSIONS: Record<Role, Action[]> = {
   admin: [...ACTIONS],
-  site_head: [...EVERYONE, 'unit.hold', 'unit.book', 'lead.reassign', 'inventory.manage', 'partner.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage'],
-  sourcing_manager: [...EVERYONE, 'unit.hold', 'unit.book', 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage'],
+  site_head: [...EVERYONE, 'unit.hold', 'unit.book', 'payment.record', 'payment.followup', 'lead.reassign', 'inventory.manage', 'partner.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage'],
+  sourcing_manager: [...EVERYONE, 'unit.hold', 'unit.book', 'payment.record', 'payment.followup', 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage'],
   closing_manager: [...EVERYONE, 'unit.hold', 'lead.reassign', 'approval.review', 'reports.view', 'visit.checkin'],
-  payment_followup: ['ai.use'],
+  payment_followup: ['ai.use', 'payment.record', 'payment.followup'],
   telecaller: [...EVERYONE, 'unit.hold'],
 };
 
-/** Permissions added after the first release, with the version that added them. Saved role sets get the defaults once. */
-export const ADDED_ACTIONS: { version: number; actions: Action[] }[] = [
+/**
+ * Permissions added after the first release, with the version that added them. Saved role sets get the defaults once.
+ * With `when`, a saved set gets them only if it already had that permission, so an admin's earlier choice still holds.
+ */
+export const ADDED_ACTIONS: { version: number; actions: Action[]; when?: Action }[] = [
   { version: 3, actions: ['unit.hold', 'unit.book'] },
+  { version: 4, actions: ['payment.record', 'payment.followup'], when: 'booking.manage' },
 ];
+
+/** What a buyer said when asked about a payment. */
+export const PAYMENT_OUTCOMES = ['Promised to pay', 'Asked for more time', 'No answer', 'Loan in process', 'Dispute', 'Other'] as const;
+
+/** Prefix for new receipt numbers. Receipts already issued keep their number. */
+export const RECEIPT_PREFIX = 'AS';
 
 export const DATA_SCOPES = [
   { value: '', label: 'Default for role' },
