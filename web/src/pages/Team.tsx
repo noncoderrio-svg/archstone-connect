@@ -1,9 +1,9 @@
 import { Copy, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { LANGUAGES, ROLES, ROLE_LABELS, MANAGER_ROLES } from '../../../shared/domain.ts';
+import { LANGUAGES, ROLES, ROLE_LABELS, MANAGER_ROLES, type Role } from '../../../shared/domain.ts';
 import { CountTabs, FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
-import { Badge, Button, Card, ErrorNote, Modal, Notice, PageHeader, SelectField, Spinner, TextField, useAction, useToast } from '../components/ui.tsx';
+import { Badge, Button, Card, CardHeader, Empty, ErrorNote, Modal, Notice, PageHeader, SelectField, Spinner, TextField, useAction, useToast } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { dateTime } from '../lib/format.ts';
@@ -126,19 +126,22 @@ function UserModal({ user, people, onClose, onPassword }: { user: any | null; pe
   );
 }
 
+const goalText = (g: any, v: number) => (g.unit === 'lakhs' ? `₹${v} L` : String(v));
+
 function Targets({ onEdit }: { onEdit: (p: any) => void }) {
   const { data } = useApi('/targets');
   if (!data) return <Spinner />;
   return (
     <Card>
+      <CardHeader title="Monthly targets" hint={data.can_edit ? 'Each role is measured on its own work. Target met averages each goal, capped at 100%.' : 'Only an admin can set targets.'} />
+      {!data.people.length && <Empty title="Nobody to show" />}
       <ul className="divide-y divide-line">
         {data.people.map((p: any) => (
-          <li key={p.id} className="flex flex-wrap items-center gap-4 px-4 py-2.5 text-sm">
-            <span className="min-w-40 flex-1"><span className="font-medium text-ink">{p.name}</span><span className="block text-xs text-muted">{p.progress.streak} day streak · {p.progress.connect_rate}% connect rate</span></span>
-            <span className="tabular-nums">Calls {p.progress.calls}/{p.progress.target.calls}</span>
-            <span className="tabular-nums">Visits {p.progress.visits}/{p.progress.target.visits}</span>
-            <span className="tabular-nums">Bookings {p.progress.bookings}/{p.progress.target.bookings}</span>
-            <Button size="sm" onClick={() => onEdit(p)}>Set target</Button>
+          <li key={p.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 text-sm">
+            <span className="min-w-40 flex-1"><span className="font-medium text-ink">{p.name}</span><span className="block text-xs text-muted">{ROLE_LABELS[p.role as Role]}</span></span>
+            {p.goals.map((g: any) => <span key={g.key} className="tabular-nums">{g.label} {goalText(g, g.actual)}/{g.target ? goalText(g, g.target) : '—'}</span>)}
+            <Badge tone={p.score == null ? 'neutral' : p.score >= 100 ? 'green' : p.score >= 60 ? 'brand' : 'red'}>{p.score == null ? 'No target' : `${p.score}% met`}</Badge>
+            {data.can_edit && <Button size="sm" onClick={() => onEdit(p)}>Set target</Button>}
           </li>
         ))}
       </ul>
@@ -147,15 +150,20 @@ function Targets({ onEdit }: { onEdit: (p: any) => void }) {
 }
 
 function TargetModal({ person, onClose }: { person: any; onClose: () => void }) {
-  const [f, setF] = useState({ calls: String(person.progress.target.calls), visits: String(person.progress.target.visits), bookings: String(person.progress.target.bookings) });
+  const [f, setF] = useState<Record<string, string>>(Object.fromEntries(person.goals.map((g: any) => [g.key, g.target ? String(g.target) : ''])));
   const { busy, run } = useAction();
-  const save = async () => { if (await run(() => api.put(`/users/${person.id}/target`, { calls: Number(f.calls), visits: Number(f.visits), bookings: Number(f.bookings) }), 'Target saved')) onClose(); };
+  const save = async () => {
+    const goals = Object.fromEntries(person.goals.map((g: any) => [g.key, Number(f[g.key]) || 0]));
+    if (await run(() => api.put(`/users/${person.id}/target`, { goals }), 'Target saved')) onClose();
+  };
   return (
-    <Modal title={`Monthly target for ${person.name}`} onClose={onClose}>
-      <div className="grid grid-cols-3 gap-3">
-        <TextField label="Calls" type="number" min="0" value={f.calls} onChange={(e) => setF({ ...f, calls: e.target.value })} />
-        <TextField label="Site visits" type="number" min="0" value={f.visits} onChange={(e) => setF({ ...f, visits: e.target.value })} />
-        <TextField label="Bookings" type="number" min="0" value={f.bookings} onChange={(e) => setF({ ...f, bookings: e.target.value })} />
+    <Modal title={`${person.name}: target for this month`} onClose={onClose}>
+      <p className="mb-3 text-[13px] text-muted">{ROLE_LABELS[person.role as Role]} goals. Leave a goal empty to skip it.</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {person.goals.map((g: any) => (
+          <TextField key={g.key} label={g.unit === 'lakhs' ? `${g.label} (₹ Lakhs)` : g.label} type="number" min="0" step={g.unit === 'lakhs' ? '0.01' : '1'}
+            value={f[g.key]} onChange={(e) => setF({ ...f, [g.key]: e.target.value })} />
+        ))}
       </div>
       <div className="mt-3 flex justify-end gap-2"><Button onClick={onClose}>Cancel</Button><Button variant="primary" busy={busy} onClick={save}>Save</Button></div>
     </Modal>

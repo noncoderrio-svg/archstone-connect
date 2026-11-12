@@ -527,6 +527,7 @@ addColumn('partners', 'manager_id', 'INTEGER REFERENCES users(id)');
 addColumn('partners', 'area', `TEXT NOT NULL DEFAULT ''`);
 addColumn('partners', 'next_contact_on', 'TEXT');
 addColumn('partners', 'last_contact_at', 'TEXT');
+addColumn('targets', 'goals', `TEXT NOT NULL DEFAULT '{}'`);
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS partner_contacts (

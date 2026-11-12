@@ -1,4 +1,6 @@
-import { isManager, isViewOnly } from '../../shared/domain.ts';
+import { ROLE_GOALS, isManager, isViewOnly, type Role } from '../../shared/domain.ts';
+import { projectIdsOf, roleTargets } from '../services/targets.ts';
+import { teamOf } from '../services/hierarchy.ts';
 import express, { Router } from 'express';
 import QRCode from 'qrcode';
 import { z } from 'zod';
@@ -163,23 +165,49 @@ insights.get('/calendar', (req, res) => {
 });
 
 // ---------- Targets ----------
+/** Only an admin sets monthly targets. Each goal must be one the person's role is measured on. */
 insights.put('/users/:id/target', (req, res) => {
-  assertCan(req.user, 'reports.view');
-  if (isViewOnly(req.user.role)) throw new HttpError(403, 'You cannot set targets.');
-  const b = z.object({ calls: z.number().int().min(0), visits: z.number().int().min(0), bookings: z.number().int().min(0) }).parse(req.body);
+  if (req.user.role !== 'admin') throw new HttpError(403, 'Only an admin can set targets.');
+  const person = get<{ id: number; role: Role }>('SELECT id, role FROM users WHERE id = ?', Number(req.params.id));
+  if (!person) throw new HttpError(404, 'User not found.');
+  const allowed = ROLE_GOALS[person.role] ?? [];
+  if (!allowed.length) throw new HttpError(400, 'This role has no targets.');
+  const amount = z.number().min(0).max(1000000);
+  const b = z.object({
+    goals: z.record(z.string(), amount).optional(),
+    calls: amount.optional(), visits: amount.optional(), bookings: amount.optional(),
+  }).parse(req.body);
+  // Older screens sent calls, visits and bookings directly.
+  const given: Record<string, number> = b.goals ?? Object.fromEntries((['calls', 'visits', 'bookings'] as const).filter((k) => b[k] !== undefined).map((k) => [k, b[k]!]));
+  const unknown = Object.keys(given).filter((k) => !(allowed as string[]).includes(k));
+  if (unknown.length) throw new HttpError(400, `Not a goal for this role: ${unknown.join(', ')}.`);
+  const goals = Object.fromEntries(allowed.map((k) => [k, Math.max(0, Number(given[k] ?? 0))]));
   run(
-    `INSERT INTO targets(user_id, month, calls, visits, bookings) VALUES(?, ?, ?, ?, ?)
-     ON CONFLICT(user_id, month) DO UPDATE SET calls = excluded.calls, visits = excluded.visits, bookings = excluded.bookings`,
-    Number(req.params.id), currentMonth(), b.calls, b.visits, b.bookings,
+    `INSERT INTO targets(user_id, month, calls, visits, bookings, goals) VALUES(?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, month) DO UPDATE SET calls = excluded.calls, visits = excluded.visits, bookings = excluded.bookings, goals = excluded.goals`,
+    person.id, currentMonth(), Math.round(goals.calls ?? 0), Math.round(goals.visits ?? 0), Math.round(goals.bookings ?? 0), JSON.stringify(goals),
   );
-  audit(req, 'target.set', 'user', String(req.params.id));
+  audit(req, 'target.set', 'user', person.id, JSON.stringify(goals));
   res.json({ ok: true });
 });
 
+/** Everyone the viewer may see: an admin sees all; a manager sees their team; a site head also sees people on their projects. */
 insights.get('/targets', requirePermission('reports.view'), (req, res) => {
   if (isViewOnly(req.user.role)) throw new HttpError(403, 'Targets are not available for your role.');
-  const people = all<any>(`SELECT id, name, role FROM users WHERE role IN ('closing_manager','telecaller') AND status = 'active' ORDER BY name`);
-  res.json({ people: people.map((p) => ({ ...p, progress: targetProgress(p.id) })) });
+  const roles = (Object.keys(ROLE_GOALS) as Role[]).filter((r) => ROLE_GOALS[r].length).map((r) => `'${r}'`).join(',');
+  let people = all<any>(`SELECT id, name, role FROM users WHERE role IN (${roles}) AND status = 'active' ORDER BY name`);
+  if (req.user.role !== 'admin') {
+    const team = new Set([req.user.id, ...teamOf(req.user.id)]);
+    const shared = req.user.role === 'site_head' && req.user.project_ids.length
+      ? new Set(all<{ user_id: number }>(`SELECT DISTINCT user_id FROM user_projects WHERE project_id IN (${req.user.project_ids.join(',')})`).map((r) => r.user_id))
+      : new Set<number>();
+    people = people.filter((p) => team.has(p.id) || shared.has(p.id));
+  }
+  res.json({
+    can_edit: req.user.role === 'admin',
+    month: currentMonth(),
+    people: people.map((p) => ({ ...p, ...roleTargets({ ...p, project_ids: projectIdsOf(p.id) }), progress: targetProgress(p.id) })),
+  });
 });
 
 // ---------- Hoarding QR codes ----------

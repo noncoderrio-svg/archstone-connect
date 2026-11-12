@@ -20,6 +20,7 @@ import {
 } from '../services/fcm.ts';
 import { pushToUser } from '../services/push.ts';
 import { assertManager, teamOf } from '../services/hierarchy.ts';
+import { topTelecallers } from '../services/targets.ts';
 import { clauseSql, leadFilters } from '../services/filters.ts';
 import { emailLive } from '../services/mail.ts';
 import { REPORT_DEFAULTS, sendReportTo } from '../services/scheduler.ts';
@@ -224,7 +225,11 @@ admin.get('/dashboard', (req, res) => {
       )!.v
     : null;
 
+  // Admins see every telecaller; a Site Head sees results on their own projects.
+  const topTele = user.role === 'admin' ? topTelecallers(null) : user.role === 'site_head' ? topTelecallers(user.project_ids) : null;
+
   res.json({
+    top_telecallers: topTele,
     stats: {
       totalLeads: count('1 = 1'),
       newToday: count('l.created_at >= ?', today),

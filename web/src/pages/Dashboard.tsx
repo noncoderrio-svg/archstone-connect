@@ -41,20 +41,49 @@ const STATS: Record<string, (s: any) => { label: string; value: any; hint?: stri
   ],
 };
 
+const goalValue = (g: any, v: number) => (g.unit === 'lakhs' ? lakhs(v) : v);
+
+/** This month's goals for the person's own role, and how much of the target is met. */
 function Targets({ p }: { p: any }) {
-  const rows = [['Calls', p.calls, p.target.calls], ['Site visits', p.visits, p.target.visits], ['Bookings', p.bookings, p.target.bookings]] as const;
+  if (!p.goals?.length) return null;
   return (
     <Card>
-      <CardHeader title="This month" action={p.streak > 0 ? <Badge tone="amber"><Flame size={12} />{p.streak} day streak</Badge> : undefined} />
+      <CardHeader title="This month" action={<span className="flex items-center gap-1.5">
+        {p.streak > 0 && <Badge tone="amber"><Flame size={12} />{p.streak} day streak</Badge>}
+        {p.score != null && <Badge tone={p.score >= 100 ? 'green' : p.score >= 60 ? 'brand' : 'red'}>Target met {p.score}%</Badge>}
+      </span>} />
       <ul className="space-y-2 px-4">
-        {rows.map(([label, done, goal]) => (
-          <li key={label} className="text-[13px]">
-            <span className="flex justify-between"><span>{label}</span><span className="font-medium text-ink tabular-nums">{done}{goal ? ` / ${goal}` : ''}</span></span>
-            {goal > 0 && <span className="mt-1 block h-1.5 rounded-full bg-surface-2"><span className="block h-full rounded-full bg-brand" style={{ width: `${Math.min(100, (done / goal) * 100)}%` }} /></span>}
+        {p.goals.map((g: any) => (
+          <li key={g.key} className="text-[13px]">
+            <span className="flex justify-between"><span>{g.label}</span><span className="font-medium text-ink tabular-nums">{goalValue(g, g.actual)}{g.target ? ` / ${goalValue(g, g.target)}` : ''}</span></span>
+            {g.target > 0 && <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-surface-2"><span className="grow-x block h-full origin-left rounded-full bg-brand" style={{ width: `${g.progress}%` }} /></span>}
           </li>
         ))}
       </ul>
-      <p className="px-4 py-3 text-xs text-muted">{p.connect_rate}% connect rate · {p.talk_minutes} min talk time · {p.qualified} qualified</p>
+      <p className="px-4 py-3 text-xs text-muted">{p.score == null ? 'No target set for this month yet. ' : ''}{p.calls ? `${p.connect_rate}% connect rate · ${p.talk_minutes} min talk time` : ''}</p>
+    </Card>
+  );
+}
+
+/** Admins and Site Heads: this month's best telecallers. Leads they own and leads they passed on both count. */
+function TopTelecallers({ rows }: { rows: any[] }) {
+  return (
+    <Card>
+      <CardHeader title="Top telecallers" hint="This month, by bookings, then site visits, qualified leads and calls" />
+      {!rows.length ? <Empty title="No telecaller results yet this month" /> : (
+        <ol className="divide-y divide-line">
+          {rows.map((t, i) => (
+            <li key={t.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-xs font-semibold text-brand-ink">{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate font-medium text-ink">{t.name}</span>
+              <span className="flex gap-3 text-xs text-muted tabular-nums">
+                <span><b className="text-ink">{t.bookings}</b> booked</span><span><b className="text-ink">{t.visits}</b> visits</span>
+                <span className="max-sm:hidden"><b className="text-ink">{t.qualified}</b> qualified</span><span className="max-sm:hidden"><b className="text-ink">{t.calls}</b> calls</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </Card>
   );
 }
@@ -219,6 +248,7 @@ export default function Dashboard() {
           </Card>
         )}
 
+        {data.top_telecallers && <TopTelecallers rows={data.top_telecallers} />}
         {showTeam && (
           <Card className="lg:col-span-2">
             <CardHeader title="Team leaderboard" hint="This month's results" />

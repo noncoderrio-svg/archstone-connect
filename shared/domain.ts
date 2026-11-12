@@ -257,6 +257,39 @@ export const ADDED_ACTIONS: { version: number; actions: Action[]; when?: Action 
   { version: 4, actions: ['payment.record', 'payment.followup'], when: 'booking.manage' },
 ];
 
+/** Monthly goals. Each role is measured on its own work. */
+export const GOALS = {
+  calls: { label: 'Calls' },
+  qualified: { label: 'Qualified leads' },
+  visits: { label: 'Site visits' },
+  bookings: { label: 'Bookings' },
+  partner_contacts: { label: 'Partner contacts' },
+  partner_visits: { label: 'Partner site visits' },
+  partner_bookings: { label: 'Partner bookings' },
+  payment_followups: { label: 'Payment follow-ups' },
+  collected_lakhs: { label: 'Amount collected', unit: 'lakhs' },
+} as const satisfies Record<string, { label: string; unit?: string }>;
+export type GoalKey = keyof typeof GOALS;
+
+export const ROLE_GOALS: Record<Role, GoalKey[]> = {
+  admin: [],
+  site_head: ['visits', 'bookings', 'collected_lakhs'],
+  sourcing_manager: ['partner_contacts', 'partner_visits', 'partner_bookings'],
+  closing_manager: ['calls', 'visits', 'bookings'],
+  payment_followup: ['payment_followups', 'collected_lakhs'],
+  telecaller: ['calls', 'qualified', 'visits'],
+};
+
+/**
+ * "Target met" is the average of each goal's progress, each capped at 100%,
+ * so one large number cannot hide a missed goal. Goals with no target are left out; no target at all means no score.
+ */
+export function targetMet(goals: { target: number; actual: number }[]): number | null {
+  const set = goals.filter((g) => g.target > 0);
+  if (!set.length) return null;
+  return Math.round((set.reduce((sum, g) => sum + Math.min(1, g.actual / g.target), 0) / set.length) * 100);
+}
+
 /** What a buyer said when asked about a payment. */
 export const PAYMENT_OUTCOMES = ['Promised to pay', 'Asked for more time', 'No answer', 'Loan in process', 'Dispute', 'Other'] as const;
 

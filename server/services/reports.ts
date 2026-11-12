@@ -1,4 +1,5 @@
 import { LEAD_ROLES, isViewOnly } from '../../shared/domain.ts';
+import { currentMonth, projectIdsOf, roleTargets, targetFor } from './targets.ts';
 import { existsSync } from 'node:fs';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
@@ -208,12 +209,16 @@ export function reportPdf(r: Report, preparedFor: string) {
 }
 
 // ---------- Targets and streaks ----------
-export const currentMonth = () => new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 7);
+export { currentMonth } from './targets.ts';
 
+/** Personal progress for the dashboard: the role's goals and score, plus streak and call quality. */
 export function targetProgress(userId: number) {
   const month = currentMonth();
   const start = `${month}-01 00:00:00`;
-  const target = get<any>('SELECT calls, visits, bookings FROM targets WHERE user_id = ? AND month = ?', userId, month) ?? { calls: 0, visits: 0, bookings: 0 };
+  const saved = targetFor(userId, month);
+  const target = { calls: saved.calls ?? 0, visits: saved.visits ?? 0, bookings: saved.bookings ?? 0 };
+  const person = get<{ role: string }>('SELECT role FROM users WHERE id = ?', userId);
+  const byRole = roleTargets({ id: userId, role: person?.role ?? '', project_ids: projectIdsOf(userId) }, month);
   const calls = get<{ n: number }>(`SELECT COUNT(*) n FROM activities WHERE actor_id = ? AND type = 'call' AND created_at >= ?`, userId, start)!.n;
   const connected = get<{ n: number }>(`SELECT COUNT(*) n FROM activities WHERE actor_id = ? AND type = 'call' AND title LIKE '%Connected%' AND created_at >= ?`, userId, start)!.n;
   const talk = get<{ s: number }>(`SELECT COALESCE(SUM(duration_seconds), 0) s FROM calls WHERE user_id = ? AND created_at >= ?`, userId, start)!.s;
@@ -253,5 +258,7 @@ export function targetProgress(userId: number) {
     streak,
     connect_rate: calls ? Math.round((connected / calls) * 100) : 0,
     talk_minutes: Math.round(talk / 60),
+    goals: byRole.goals,
+    score: byRole.score,
   };
 }

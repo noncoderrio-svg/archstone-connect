@@ -1,5 +1,6 @@
 import { LEAD_ROLES, isManager } from '../../shared/domain.ts';
 import type { SessionUser } from '../auth.ts';
+import { projectIdsOf, roleTargets } from './targets.ts';
 import { all, nowIso } from '../db.ts';
 import { teamOf } from './hierarchy.ts';
 
@@ -106,6 +107,8 @@ export function agentPerformance(user: SessionUser, q: Record<string, string>) {
       visits: visits.get(u.id)?.visits ?? 0, messages: messages.get(u.id)?.messages ?? 0,
       new_leads: l.new_leads ?? 0, booked: l.booked ?? 0, response_minutes: response,
       score: activityScore(onTimeRate, connectRate, responsePoints(response)),
+      // This month's target met, by the person's own role goals.
+      target_score: roleTargets({ id: u.id, role: u.role, project_ids: projectIdsOf(u.id) }).score,
     };
   });
 

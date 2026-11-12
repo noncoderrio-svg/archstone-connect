@@ -269,8 +269,9 @@ test('daily brief and targets reflect the person\'s own work', async () => {
   const brief = (await users.tele1.get('/api/brief')).data;
   assert.ok(brief.items.length > 0);
   const tele = await me(users.tele1);
-  assert.equal((await users.tele1.put(`/api/users/${tele.id}/target`, { calls: 100, visits: 5, bookings: 1 })).status, 403);
-  assert.equal((await users.manager.put(`/api/users/${tele.id}/target`, { calls: 100, visits: 5, bookings: 1 })).status, 200);
+  assert.equal((await users.tele1.put(`/api/users/${tele.id}/target`, { calls: 100, visits: 5 })).status, 403);
+  assert.equal((await users.manager.put(`/api/users/${tele.id}/target`, { calls: 100, visits: 5 })).status, 403, 'only an admin sets targets');
+  assert.equal((await users.admin.put(`/api/users/${tele.id}/target`, { calls: 100, visits: 5 })).status, 200);
   const lead = (await users.tele1.get('/api/leads')).data.leads[0];
   await users.tele1.post(`/api/leads/${lead.id}/call`, { disposition: 'Connected' });
   const p = (await users.tele1.get('/api/brief')).data.progress;
@@ -279,7 +280,7 @@ test('daily brief and targets reflect the person\'s own work', async () => {
   assert.equal(p.streak, 1);
   assert.equal(p.connect_rate, 100);
   assert.equal((await users.tele1.get('/api/targets')).status, 403);
-  assert.ok((await users.manager.get('/api/targets')).data.people.length >= 4);
+  assert.ok((await users.admin.get('/api/targets')).data.people.length >= 4);
 });
 
 // ---------- Templates ----------

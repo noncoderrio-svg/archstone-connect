@@ -99,7 +99,7 @@ export default function Performance() {
               {agents.map((a: any) => (
                 <li key={a.id}>
                   <button type="button" onClick={() => set({ owner: String(a.id) })} className="flex w-full items-center gap-2 px-4 py-2.5 text-left">
-                    <span className="min-w-0 flex-1"><span className="block truncate font-medium text-ink">{a.name}</span><span className="block text-xs text-muted">{orNone(a.on_time_rate, '%')} on time · {a.missed} missed · {a.calls} calls</span></span>
+                    <span className="min-w-0 flex-1"><span className="block truncate font-medium text-ink">{a.name}</span><span className="block text-xs text-muted">{orNone(a.on_time_rate, '%')} on time · {a.missed} missed · {a.calls} calls{a.target_score != null ? ` · target ${a.target_score}%` : ''}</span></span>
                     <Badge tone={scoreTone(a.score)}>{orNone(a.score)}</Badge>
                   </button>
                 </li>
@@ -110,6 +110,7 @@ export default function Performance() {
                 <thead><tr className="border-b border-line text-left text-[13px] text-muted">
                   <th className="px-4 py-2 font-medium">Agent</th>
                   {['Set', 'Due', 'On time', 'Late', 'Missed', 'Moved', 'Calls', 'Connect', 'Response', 'Visits', 'Booked'].map((h) => <th key={h} className="px-2 py-2 text-right font-medium">{h}</th>)}
+                  <th className="px-2 py-2 text-right font-medium">Target met</th>
                   <th className="px-4 py-2 text-right font-medium">Score</th>
                 </tr></thead>
                 <tbody className="divide-y divide-line">
@@ -127,6 +128,7 @@ export default function Performance() {
                       <td className="px-2 text-right whitespace-nowrap tabular-nums">{orNone(a.response_minutes, ' min')}</td>
                       <td className="px-2 text-right tabular-nums">{a.visits}</td>
                       <td className="px-2 text-right tabular-nums">{a.booked}</td>
+                      <td className="px-2 text-right tabular-nums">{orNone(a.target_score, '%')}</td>
                       <td className="px-4 text-right"><Badge tone={scoreTone(a.score)}>{orNone(a.score)}</Badge></td>
                     </tr>
                   ))}
