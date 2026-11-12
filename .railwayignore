@@ -1,0 +1,9 @@
+node_modules
+dist
+data
+data-preview
+mobile
+tests
+.env
+/*.apk
+*.log

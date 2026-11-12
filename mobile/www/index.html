@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Archstone Connect</title>
+    <style>
+      body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; background: #fff; color: #1e293b; }
+      main { width: min(22rem, 86vw); text-align: center; }
+      img { width: 16rem; max-width: 80vw; height: auto; margin-bottom: 1.5rem; }
+      h1 { font-size: 1.4rem; margin: 0; }
+      p { color: #64748b; font-size: 0.9rem; }
+      input { box-sizing: border-box; width: 100%; height: 2.8rem; padding: 0 0.8rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; font-size: 1rem; }
+      button { width: 100%; height: 2.8rem; margin-top: 0.7rem; border: 0; border-radius: 0.5rem; background: #C85A1E; color: #fff; font-size: 1rem; font-weight: 600; }
+      #error { color: #b91c1c; min-height: 1.2rem; }
+    </style>
+  </head>
+  <body>
+    <main id="setup" hidden>
+      <img src="logo.png" alt="Archstone" />
+      <h1>Archstone Connect</h1>
+      <p>Enter the address your admin gave you.</p>
+      <form id="form">
+        <input id="address" type="url" inputmode="url" autocomplete="off" autocapitalize="off" placeholder="https://crm.yourcompany.com" required />
+        <p id="error" role="alert"></p>
+        <button type="submit">Continue</button>
+      </form>
+    </main>
+    <script>
+      const KEY = 'archstone-server';
+      // Staff should not have to type anything. A saved address can still override this.
+      // Put your live Archstone Connect address here before building, so staff skip the setup screen.
+      const DEFAULT_SERVER = '';
+      const saved = localStorage.getItem(KEY) || DEFAULT_SERVER;
+
+      // Plain http is allowed only on a private office network, for testing.
+      function clean(value) {
+        const url = new URL(value.trim());
+        const local = /^(localhost|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url.hostname);
+        if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) throw new Error('Use an https:// address.');
+        return url.origin;
+      }
+
+      if (saved) location.replace(saved);
+      else document.getElementById('setup').hidden = false;
+
+      document.getElementById('form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        try {
+          const origin = clean(document.getElementById('address').value);
+          localStorage.setItem(KEY, origin);
+          location.replace(origin);
+        } catch (e) {
+          document.getElementById('error').textContent = e instanceof TypeError ? 'That address is not valid.' : e.message;
+        }
+      });
+    </script>
+  </body>
+</html>

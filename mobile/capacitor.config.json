@@ -1,0 +1,19 @@
+{
+  "appId": "com.archstone.connect",
+  "appName": "Archstone Connect",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "allowNavigation": ["*"],
+    "errorPath": "error.html"
+  },
+  "android": {
+    "backgroundColor": "#15181E"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "disable"
+    }
+  }
+}

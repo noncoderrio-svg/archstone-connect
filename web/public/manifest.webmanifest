@@ -1,0 +1,14 @@
+{
+  "name": "Archstone Connect",
+  "short_name": "Archstone",
+  "description": "Archstone CRM and WhatsApp marketing for real estate mandates",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#15181e",
+  "theme_color": "#15181e",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

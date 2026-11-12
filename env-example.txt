@@ -1,0 +1,77 @@
+# Copy this file to .env and fill in what you have.
+# Anything left blank stays in clearly labelled demo mode.
+#
+# Only the first block below is needed to start the app. Everything from
+# WEBSITE_API_KEY onwards, except SECRET_KEY, can instead be set by an administrator
+# in Settings, Integrations. A value saved there replaces the one here.
+
+PORT=4000
+# Full public address of this app, used for webhook links shown in Settings
+APP_URL=http://localhost:4000
+# Set to true only on the live server (requires HTTPS)
+SECURE_COOKIES=false
+# Demo mode adds sample staff, leads and units. Set to false on the live server.
+DEMO_MODE=true
+
+# The first administrator. Only used once, when the database is created.
+INITIAL_ADMIN_EMAIL=
+# Optional, for hosted servers. Used once, and must be changed at first login.
+INITIAL_ADMIN_PASSWORD=
+# Stops uploads at this size, so files cannot fill the disk the database needs. Keep it below your disk size.
+STORAGE_LIMIT_MB=0
+
+# Key your website form sends in the X-Api-Key header
+WEBSITE_API_KEY=
+
+# WhatsApp Business Platform (Cloud API), from developers.facebook.com
+WHATSAPP_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_BUSINESS_ACCOUNT_ID=
+WHATSAPP_VERIFY_TOKEN=
+META_APP_SECRET=
+META_API_VERSION=v21.0
+
+# Meta Lead Ads: a Page access token with leads_retrieval permission
+META_PAGE_TOKEN=
+
+# Google Gemini, from aistudio.google.com
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+
+# Key that property portals send to /webhooks/portal/<name>
+PORTAL_API_KEY=
+
+# The key you enter in the Google Ads lead form webhook settings
+GOOGLE_ADS_WEBHOOK_KEY=
+
+# Your WhatsApp number with country code, used for hoarding QR codes. Example: 919876543210
+WHATSAPP_DISPLAY_NUMBER=
+# Your Meta app id, needed to submit templates with an image, document or video
+META_APP_ID=
+
+# Outgoing email for reports and urgent alerts
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=
+
+# Encrypts KYC files, 2FA secrets and Google tokens.
+# Left blank, a key is created at data/secret.key. Back it up: without it, those files cannot be read.
+SECRET_KEY=
+
+# Exotel click-to-call. Staff need a mobile number on their Team profile.
+EXOTEL_SID=
+EXOTEL_API_KEY=
+EXOTEL_API_TOKEN=
+EXOTEL_SUBDOMAIN=api.exotel.com
+EXOTEL_CALLER_ID=
+TELEPHONY_WEBHOOK_TOKEN=
+
+# Google sign-in for Calendar, Contacts and Drive, from console.cloud.google.com
+# Redirect URL to register: APP_URL/api/google/callback
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Secret for the cron wake-up link (/cron/tick?token=...). Use a long random value.
+CRON_TOKEN=

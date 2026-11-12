@@ -1,0 +1,11 @@
+node_modules
+dist
+data
+.env
+*.log
+data-preview
+mobile/node_modules
+startup-error.log
+.claude/settings.local.json
+mobile/android/app/build
+mobile/android/.gradle

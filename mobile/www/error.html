@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Archstone Connect</title>
+    <style>
+      body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; color: #1e293b; text-align: center; }
+      main { width: min(22rem, 86vw); }
+      p { color: #64748b; }
+      button { width: 100%; height: 2.8rem; margin-top: 0.6rem; border-radius: 0.5rem; font-size: 1rem; font-weight: 600; border: 1px solid #cbd5e1; background: #fff; color: #1e293b; }
+      .primary { background: #C85A1E; border: 0; color: #fff; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Can't reach Archstone Connect</h1>
+      <p>Check your internet connection, then try again.</p>
+      <button class="primary" onclick="location.replace(localStorage.getItem('archstone-server') || 'index.html')">Try again</button>
+      <button onclick="localStorage.removeItem('archstone-server'); location.replace('index.html')">Change address</button>
+    </main>
+  </body>
+</html>

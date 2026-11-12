@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "archstone-connect",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["--disable-warning=ExperimentalWarning", "--import", "tsx", "server/index.ts"],
+      "port": 4000
+    }
+  ]
+}
