@@ -4,75 +4,12 @@ import { REDEVELOPMENT_SCHEMES, REDEVELOPMENT_STAGES } from '../../shared/domain
 import { HttpError, requirePermission } from '../auth.ts';
 import { all, get, nowIso, run, tx } from '../db.ts';
 import { audit, normalizePhone, visibleLead } from '../services/core.ts';
-import { ingestLead, logActivity } from '../services/leads.ts';
+import { logActivity } from '../services/leads.ts';
 
 export const growth = Router();
 
 // ---------- Channel partners ----------
-const partnerBody = z.object({
-  name: z.string().trim().min(2).max(100),
-  firm: z.string().trim().max(120).default(''),
-  phone: z.string().max(20).default(''),
-  email: z.union([z.email(), z.literal('')]).default(''),
-  rera_agent_number: z.string().trim().max(40).default(''),
-  commission_percent: z.number().min(0).max(20),
-  status: z.enum(['active', 'paused']).default('active'),
-});
-
-growth.get('/partners', requirePermission('partner.manage'), (_req, res) => {
-  res.json({
-    partners: all(
-      `SELECT x.*,
-        (SELECT COUNT(*) FROM leads l WHERE l.partner_id = x.id AND l.deleted_at IS NULL) AS leads,
-        (SELECT COUNT(*) FROM commissions c WHERE c.partner_id = x.id AND c.status != 'cancelled') AS bookings,
-        COALESCE((SELECT SUM(c.amount_lakhs) FROM commissions c WHERE c.partner_id = x.id AND c.status IN ('pending','approved')), 0) AS due_lakhs,
-        COALESCE((SELECT SUM(c.amount_lakhs) FROM commissions c WHERE c.partner_id = x.id AND c.status = 'paid'), 0) AS paid_lakhs
-       FROM partners x ORDER BY x.status, x.name`,
-    ),
-    commissions: all(
-      `SELECT c.*, x.name AS partner_name, l.name AS lead_name, b.amount_lakhs AS booking_lakhs FROM commissions c
-       JOIN partners x ON x.id = c.partner_id JOIN bookings b ON b.id = c.booking_id JOIN leads l ON l.id = b.lead_id
-       WHERE c.status != 'cancelled' ORDER BY c.id DESC LIMIT 100`,
-    ),
-  });
-});
-
-growth.post('/partners', requirePermission('partner.manage'), (req, res) => {
-  const b = partnerBody.parse(req.body);
-  const phone = b.phone ? normalizePhone(b.phone) : '';
-  const r = run(
-    'INSERT INTO partners(name, firm, phone, email, rera_agent_number, commission_percent, status) VALUES(?, ?, ?, ?, ?, ?, ?)',
-    b.name, b.firm, phone, b.email, b.rera_agent_number, b.commission_percent, b.status,
-  );
-  audit(req, 'partner.create', 'partner', r.id, b.name);
-  res.status(201).json({ id: r.id });
-});
-
-growth.put('/partners/:id', requirePermission('partner.manage'), (req, res) => {
-  const b = partnerBody.parse(req.body);
-  const phone = b.phone ? normalizePhone(b.phone) : '';
-  run(
-    'UPDATE partners SET name = ?, firm = ?, phone = ?, email = ?, rera_agent_number = ?, commission_percent = ?, status = ? WHERE id = ?',
-    b.name, b.firm, phone, b.email, b.rera_agent_number, b.commission_percent, b.status, Number(req.params.id),
-  );
-  audit(req, 'partner.update', 'partner', String(req.params.id), `${b.commission_percent}%`);
-  res.json({ ok: true });
-});
-
-/** Registers a buyer for a partner. An existing lead keeps its original attribution. */
-growth.post('/partners/:id/leads', requirePermission('partner.manage'), (req, res) => {
-  const partner = get<any>(`SELECT * FROM partners WHERE id = ? AND status = 'active'`, Number(req.params.id));
-  if (!partner) throw new HttpError(404, 'Active partner not found.');
-  const b = z.object({ name: z.string().trim().min(2).max(100), phone: z.string().min(8).max(20), notes: z.string().max(500).optional() }).parse(req.body);
-  const result = ingestLead({ ...b, source: 'Channel Partner', partner_id: partner.id }, req.user.id);
-  let attributed = true;
-  if (result.duplicate) {
-    const lead = get<any>('SELECT partner_id FROM leads WHERE id = ?', result.id)!;
-    attributed = lead.partner_id === partner.id;
-  }
-  audit(req, 'partner.lead', 'lead', result.id, `partner ${partner.id}, attributed ${attributed}`);
-  res.status(result.created ? 201 : 200).json({ ...result, attributed });
-});
+// The partner list, contact log and partner leads live in partners.ts.
 
 growth.post('/leads/:id/partner', requirePermission('partner.manage'), (req, res) => {
   const lead = visibleLead(req.user, Number(req.params.id));

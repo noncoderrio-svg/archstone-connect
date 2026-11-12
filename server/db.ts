@@ -525,6 +525,21 @@ addColumn('wa_numbers', 'phone_app', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('wa_numbers', 'history_status', `TEXT NOT NULL DEFAULT ''`);
 addColumn('partners', 'manager_id', 'INTEGER REFERENCES users(id)');
 addColumn('partners', 'area', `TEXT NOT NULL DEFAULT ''`);
+addColumn('partners', 'next_contact_on', 'TEXT');
+addColumn('partners', 'last_contact_at', 'TEXT');
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS partner_contacts (
+  id INTEGER PRIMARY KEY,
+  partner_id INTEGER NOT NULL REFERENCES partners(id),
+  user_id INTEGER REFERENCES users(id),
+  kind TEXT NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  next_contact_on TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_partner_contacts ON partner_contacts(partner_id);
+`);
 
 type Row = Record<string, any>;
 type Params = SQLInputValue[];

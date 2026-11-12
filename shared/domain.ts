@@ -239,7 +239,7 @@ const EVERYONE: Action[] = ['lead.create', 'whatsapp.send', 'campaign.create', '
 /** Starting points. An admin can change any of these, by role or for one person. */
 export const PERMISSIONS: Record<Role, Action[]> = {
   admin: [...ACTIONS],
-  site_head: [...EVERYONE, 'unit.hold', 'unit.book', 'lead.reassign', 'inventory.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage'],
+  site_head: [...EVERYONE, 'unit.hold', 'unit.book', 'lead.reassign', 'inventory.manage', 'partner.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage'],
   sourcing_manager: [...EVERYONE, 'unit.hold', 'unit.book', 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage'],
   closing_manager: [...EVERYONE, 'unit.hold', 'lead.reassign', 'approval.review', 'reports.view', 'visit.checkin'],
   payment_followup: ['ai.use'],
