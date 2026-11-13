@@ -47,7 +47,7 @@ const FIELDS: Field[] = [
   { key: 'google_id', label: 'Client ID', path: 'google.clientId' },
   { key: 'google_secret', label: 'Client secret', path: 'google.clientSecret', secret: true },
   { key: 'gemini_key', label: 'API key', path: 'gemini.key', secret: true, hint: 'From Google AI Studio.' },
-  { key: 'gemini_model', label: 'Model', path: 'gemini.model', pattern: /^[\w.-]+$/, rule: 'use a model name such as gemini-2.5-flash.' },
+  { key: 'gemini_model', label: 'Model', path: 'gemini.model', pattern: /^[\w.-]+$/, rule: 'use a model name such as gemini-3.8-flash.', hint: 'Leave empty to use gemini-3.8-flash.' },
   { key: 'smtp_host', label: 'Mail server', path: 'smtp.host', placeholder: 'smtp.gmail.com', ...HOST },
   { key: 'smtp_port', label: 'Port', path: 'smtp.port', pattern: /^\d{1,5}$/, rule: 'use a number such as 587.' },
   { key: 'smtp_user', label: 'Username', path: 'smtp.user' },

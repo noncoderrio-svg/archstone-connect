@@ -2,6 +2,9 @@ import { existsSync } from 'node:fs';
 
 if (existsSync('.env') && !process.env.ARCHSTONE_SKIP_DOTENV) process.loadEnvFile('.env');
 
+/** Google retires older model names; gemini-2.5-flash stopped working for new keys in 2026. */
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+
 const env = (key: string, fallback = '') => process.env[key]?.trim() || fallback;
 
 export const config = {
@@ -28,7 +31,7 @@ export const config = {
     apiVersion: env('META_API_VERSION', 'v21.0'),
   },
   metaPageToken: env('META_PAGE_TOKEN'),
-  gemini: { key: env('GEMINI_API_KEY'), model: env('GEMINI_MODEL', 'gemini-2.5-flash') },
+  gemini: { key: env('GEMINI_API_KEY'), model: env('GEMINI_MODEL', DEFAULT_GEMINI_MODEL) },
   portalApiKey: env('PORTAL_API_KEY'),
   secretKey: env('SECRET_KEY'),
   exotel: {

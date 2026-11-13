@@ -327,6 +327,20 @@ test('the assistant is for everyone the admin allows, and sees only their data',
     await users.admin.put(`/api/users/${ids.tele1}/permissions`, { allow: [], deny: ['ai.use'], data_scope: '' });
     assert.equal((await users.tele1.post('/api/ai/assistant', { question: 'Hello there' })).status, 403);
     await users.admin.put(`/api/users/${ids.tele1}/permissions`, { allow: [], deny: [], data_scope: '' });
+
+    // Newer models send their thinking as separate parts: only the answer is shown.
+    fake = (url: string) => (url.includes('generativelanguage')
+      ? Response.json({ candidates: [{ content: { parts: [{ text: 'planning...', thought: true }, { text: 'Visit the site today.' }] }, finishReason: 'STOP' }] })
+      : Response.json({}));
+    assert.equal((await users.tele1.post('/api/ai/assistant', { question: 'What next?' })).data.text, 'Visit the site today.');
+
+    // A model Google has retired gets a plain fix, not a hang or Google's wording alone.
+    fake = (url: string) => (url.includes('generativelanguage')
+      ? Response.json({ error: { message: 'This model models/old-flash is no longer available to new users.' } }, { status: 404 })
+      : Response.json({}));
+    const retired = await users.tele1.post('/api/ai/assistant', { question: 'What next?' });
+    assert.equal(retired.status, 502);
+    assert.match(retired.data.error, /Settings, Integrations, Gemini AI/);
   } finally {
     config.gemini.key = '';
     fake = null;

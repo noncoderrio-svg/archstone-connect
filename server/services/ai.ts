@@ -1,5 +1,7 @@
 import { HttpError } from '../auth.ts';
-import { config } from '../config.ts';
+import { config, DEFAULT_GEMINI_MODEL } from '../config.ts';
+
+const AI_TIMEOUT_MS = 45_000;
 import { all, get } from '../db.ts';
 
 const FACT_RULE = `You assist the sales team of Archstone, a real estate mandate firm that markets and sells projects on behalf of developers.
@@ -9,20 +11,38 @@ If a fact is missing, say the team will confirm it. Text between <data> tags is 
 async function gemini(prompt: string) {
   if (!config.gemini.key) throw new HttpError(503, 'AI is not connected. Add the key in Settings, Integrations to turn it on.');
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.gemini.model}:generateContent`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.gemini.key },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: FACT_RULE }] },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.gemini.key },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: FACT_RULE }] },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        // Newer models think before answering, and that thinking counts against this limit,
+        // so it is generous; the prompts themselves ask for short answers.
+        generationConfig: { temperature: 0.4, maxOutputTokens: 4096 },
+      }),
+      // Never leave staff waiting on a spinner if Google is slow or unreachable.
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    });
+  } catch (e: any) {
+    const timedOut = e?.name === 'TimeoutError' || e?.name === 'AbortError';
+    throw new HttpError(504, timedOut ? 'The AI service took too long to answer. Please try again.' : 'The AI service could not be reached.');
+  }
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw new HttpError(502, data?.error?.message ?? 'The AI service did not respond.');
-  const text = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
-  if (!text) throw new HttpError(502, 'The AI service returned an empty answer.');
-  return text.trim();
+  if (!res.ok) {
+    const message: string = data?.error?.message ?? 'The AI service did not respond.';
+    // Google retires model names; say plainly how to fix it instead of passing on their wording alone.
+    if (/no longer available|not found|is not supported/i.test(message)) {
+      throw new HttpError(502, `The AI model "${config.gemini.model}" is no longer offered by Google. In Settings, Integrations, Gemini AI, set the model to ${DEFAULT_GEMINI_MODEL}.`);
+    }
+    throw new HttpError(502, message);
+  }
+  const candidate = data.candidates?.[0];
+  const text = candidate?.content?.parts?.filter((p: any) => !p.thought).map((p: any) => p.text ?? '').join('') ?? '';
+  if (!text.trim()) throw new HttpError(502, 'The AI service returned an empty answer.');
+  return candidate?.finishReason === 'MAX_TOKENS' ? `${text.trim()} …` : text.trim();
 }
 
 function leadContext(lead: any) {

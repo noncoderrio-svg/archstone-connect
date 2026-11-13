@@ -350,10 +350,11 @@ export function Layout() {
         <Sidebar items={items} collapsed={sidebar.collapsed} onToggle={sidebar.toggle} />
       </aside>
       {menuOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-slate-950/50" onClick={() => setMenuOpen(false)} />
-          <div className="dialog relative h-full w-64 overflow-hidden rounded-r-3xl"><Sidebar items={items} onNavigate={() => setMenuOpen(false)} /></div>
-          <IconButton label="Close menu" className="absolute top-3 right-3 bg-surface" onClick={() => setMenuOpen(false)}><X size={18} /></IconButton>
+        // Above the header (z-40), so the open menu is never covered by it.
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
+          <div className="dialog relative h-full w-[min(18rem,82vw)] overflow-hidden rounded-r-3xl pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl"><Sidebar items={items} onNavigate={() => setMenuOpen(false)} /></div>
+          <IconButton label="Close menu" className="absolute top-[calc(env(safe-area-inset-top)+0.75rem)] right-3 bg-surface shadow-md" onClick={() => setMenuOpen(false)}><X size={18} /></IconButton>
         </div>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
@@ -370,7 +371,8 @@ export function Layout() {
           </p>
         )}
         <header className="frost relative z-40 flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-center gap-1 border-b border-line/70 px-2 pt-[env(safe-area-inset-top)] sm:gap-2 sm:px-3 lg:px-5">
-          <IconButton label="Open menu" className="lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={20} /></IconButton>          <span className="font-display text-base font-semibold text-ink sm:hidden">Archstone Connect</span>
+          <IconButton label="Open menu" className="shrink-0 lg:hidden" onClick={() => setMenuOpen(true)}><Menu size={20} /></IconButton>
+          <span className="min-w-0 truncate font-display text-[17px] font-semibold whitespace-nowrap text-ink sm:hidden">Archstone</span>
           <form onSubmit={search} role="search" className="relative hidden max-w-md flex-1 sm:block">
             <Search size={16} className="absolute top-2.5 left-3 text-muted" />
             <Input aria-label="Search all leads" placeholder="Search leads  (Ctrl+K for everything)" className="h-9 bg-surface-2 pl-9" value={query} onChange={(e) => setQuery(e.target.value)} />
