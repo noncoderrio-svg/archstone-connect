@@ -9,6 +9,7 @@ import { ConfirmErase, EraseButton } from '../components/Erase.tsx';
 import { openAssistant } from '../components/Assistant.tsx';
 import { LabelButton, LabelChip, useLabels } from '../components/Labels.tsx';
 import { Page } from '../components/Layout.tsx';
+import { CountTabs } from '../components/Filters.tsx';
 import {
   Badge, Input, Button, Card, CardHeader, Empty, ErrorNote, Modal, Notice, Select, SelectField, Spinner, TempBadge, TextField, Textarea, TextareaField, useAction, useToast,
 } from '../components/ui.tsx';
@@ -240,6 +241,17 @@ function CostSheetModal({ lead, onClose }: { lead: any; onClose: () => void }) {
 }
 
 /** PAN and Aadhaar numbers. Aadhaar is checked, then only its last 4 digits are kept. Every look is logged. */
+/** Groups for the activity filter on a lead. */
+const ACTIVITY_GROUPS: { value: string; label: string; types: string[] }[] = [
+  { value: 'call', label: 'Calls', types: ['call'] },
+  { value: 'whatsapp', label: 'WhatsApp', types: ['whatsapp', 'bot', 'automation'] },
+  { value: 'visit', label: 'Visits', types: ['visit'] },
+  { value: 'task', label: 'Follow-ups', types: ['task'] },
+  { value: 'note', label: 'Notes', types: ['note', 'manager_note'] },
+  { value: 'change', label: 'Changes', types: [] }, // Everything else: stage, assignment, documents, payments...
+];
+const activityGroup = (type: string) => ACTIVITY_GROUPS.find((g) => g.types.includes(type))?.value ?? 'change';
+
 function KycNumbers({ leadId }: { leadId: number }) {
   const { data, reload } = useApi(`/leads/${leadId}/kyc`);
   const [editing, setEditing] = useState(false);
@@ -426,6 +438,7 @@ export default function LeadDetail() {
   const [modal, setModal] = useState<'call' | 'task' | 'visit' | 'handoff' | 'book' | 'cost' | 'edit' | 'script' | null>(null);
   const { data: next, reload: reloadNext } = useApi(`/leads/${id}/next-action`, ['leads', 'inbox', 'visits']);
   const [note, setNote] = useState('');
+  const [activityKind, setActivityKind] = useState('');
   const [managerNote, setManagerNote] = useState('');
   const catalog = useLabels();
   const [summary, setSummary] = useState('');
@@ -549,8 +562,14 @@ export default function LeadDetail() {
                 <Button busy={busy} disabled={!managerNote.trim()} onClick={addManagerNote}>Add</Button>
               </div>
             )}
+            <div className="border-t border-line px-4 pt-3">
+              <CountTabs label="Show activity" value={activityKind} onChange={setActivityKind} tabs={[
+                { value: '', label: 'All', count: timeline.length },
+                ...ACTIVITY_GROUPS.map((g) => ({ value: g.value, label: g.label, count: timeline.filter((a: any) => activityGroup(a.type) === g.value).length })).filter((t) => t.count),
+              ]} />
+            </div>
             <ol className="border-t border-line">
-              {timeline.map((a: any) => (
+              {timeline.filter((a: any) => !activityKind || activityGroup(a.type) === activityKind).map((a: any) => (
                 <li key={a.id} className="flex gap-3 border-b border-line px-4 py-2.5 last:border-0">
                   <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-ink">{ACTIVITY_ICONS[a.type] ?? <FileText size={15} />}</span>
                   <div className="min-w-0 flex-1">
@@ -614,10 +633,10 @@ export default function LeadDetail() {
               <ul className="divide-y divide-line">
                 {visits.map((v: any) => (
                   <li key={v.id} className="px-4 py-2 text-sm">
-                    <span className="flex justify-between gap-2"><span className="font-medium text-ink">{v.project_name}</span><Badge tone={v.status === 'Scheduled' ? 'brand' : v.status === 'No Show' ? 'red' : 'green'}>{v.status}</Badge></span>
+                    <span className="flex justify-between gap-2"><span className="font-medium text-ink">{v.project_name}</span><Badge tone={['Scheduled', 'Confirmed'].includes(v.status) ? 'brand' : ['No Show', 'Cancelled'].includes(v.status) ? 'red' : 'green'}>{v.status}</Badge></span>
                     <span className="flex justify-between gap-2 text-xs text-muted">
                       {dateTime(v.scheduled_at)}
-                      {v.status === 'Scheduled' && <a className="text-brand-ink hover:underline" target="_blank" rel="noreferrer" href={googleCalendarLink(`Site visit: ${lead.name}`, v.project_name, v.scheduled_at)}>Add to calendar</a>}
+                      {['Scheduled', 'Confirmed'].includes(v.status) && <a className="text-brand-ink hover:underline" target="_blank" rel="noreferrer" href={googleCalendarLink(`Site visit: ${lead.name}`, v.project_name, v.scheduled_at)}>Add to calendar</a>}
                     </span>
                   </li>
                 ))}

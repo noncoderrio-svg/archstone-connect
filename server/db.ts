@@ -570,6 +570,10 @@ CREATE TABLE IF NOT EXISTS bulletins (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+addColumn('site_visits', 'confirmed_at', 'TEXT');
+addColumn('site_visits', 'reschedules', 'INTEGER NOT NULL DEFAULT 0');
+addColumn('site_visits', 'next_step', `TEXT NOT NULL DEFAULT ''`);
+addColumn('site_visits', 'closed_at', 'TEXT');
 addColumn('users', 'weekly_off', `TEXT NOT NULL DEFAULT ''`);
 addColumn('users', 'shift_start', `TEXT NOT NULL DEFAULT ''`);
 addColumn('users', 'shift_end', `TEXT NOT NULL DEFAULT ''`);

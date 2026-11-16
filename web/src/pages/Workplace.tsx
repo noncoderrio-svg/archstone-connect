@@ -2,6 +2,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ROLES, ROLE_LABELS, WEEKDAYS } from '../../../shared/domain.ts';
 import { BULLETIN_KINDS } from '../components/Bulletin.tsx';
+import { FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { Badge, Button, Card, Empty, ErrorNote, IconButton, Modal, Notice, PageHeader, SelectField, Spinner, TextField, TextareaField, cx, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
@@ -50,19 +51,32 @@ function Bulletins() {
   const { data, error, loading, reload } = useApi('/bulletins', ['bulletins']);
   const [editing, setEditing] = useState<any>(null);
   const { run } = useAction();
+  const { f, set, clear, activeCount } = useFilters(['bq', 'bstatus', 'bkind', 'brole'] as const);
   if (loading) return <Spinner />;
   if (error) return <ErrorNote>{error}</ErrorNote>;
   const today = data.today;
   const status = (b: any) => (!b.active ? ['Paused', 'neutral'] : b.ends_on < today ? ['Ended', 'neutral'] : b.starts_on > today ? ['Scheduled', 'brand'] : ['Showing now', 'green']) as [string, any];
+  const shown = filterRows<any>(data.bulletins, { q: f.bq }, {
+    search: (b) => [b.text, b.author],
+    test: (b) => (!f.bstatus || status(b)[0] === f.bstatus) && (!f.bkind || b.kind === f.bkind)
+      && (!f.brole || (f.brole === 'everyone' ? !b.roles.length : b.roles.includes(f.brole))),
+  });
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-sm text-muted">Messages scroll under the top bar for the people you choose, between the dates you set.</p>
         <Button variant="primary" onClick={() => setEditing({ text: '', kind: 'news', starts_on: today, ends_on: plusDays(today, 7), roles: [], active: true })}><Plus size={15} />New message</Button>
       </div>
-      {!data.bulletins.length ? <Empty title="No messages yet">Add a target, launch, offer or birthday wish.</Empty> : (
+      {!!data.bulletins.length && (
+        <FilterBar search={<SearchBox placeholder="Search messages" value={f.bq} onChange={(bq) => set({ bq })} />} activeCount={activeCount} onClear={clear} shown={shown.length} total={data.bulletins.length} noun="messages">
+          <FilterPill label="Status" value={f.bstatus} options={['Showing now', 'Scheduled', 'Ended', 'Paused'].map((s) => ({ value: s, label: s }))} onChange={(bstatus) => set({ bstatus })} />
+          <FilterPill label="Type" value={f.bkind} options={Object.entries(BULLETIN_KINDS).map(([value, label]) => ({ value, label }))} onChange={(bkind) => set({ bkind })} />
+          <FilterPill label="Who sees it" value={f.brole} options={[{ value: 'everyone', label: 'Everyone' }, ...ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }))]} onChange={(brole) => set({ brole })} />
+        </FilterBar>
+      )}
+      {!data.bulletins.length ? <Empty title="No messages yet">Add a target, launch, offer or birthday wish.</Empty> : !shown.length ? <Empty title="No messages match">Change or reset the filters.</Empty> : (
         <Card className="divide-y divide-line">
-          {data.bulletins.map((b: any) => {
+          {shown.map((b: any) => {
             const [label, tone] = status(b);
             return (
               <div key={b.id} className="flex items-start gap-3 px-4 py-3">
@@ -159,15 +173,29 @@ function Duty() {
   const [editing, setEditing] = useState<any>(null);
   const [absent, setAbsent] = useState<any>(null);
   const { run } = useAction();
+  const { f, set, clear, activeCount } = useFilters(['q', 'state', 'role', 'team', 'off'] as const);
   if (loading) return <Spinner />;
   if (error) return <ErrorNote>{error}</ErrorNote>;
+  const people = filterRows<any>(data.people, f, {
+    search: (p) => [p.name, p.team],
+    match: { state: (p) => p.state, role: (p) => p.role, team: (p) => p.team },
+    test: (p) => !f.off || (f.off === 'none' ? !p.weekly_off.length : p.weekly_off.includes(Number(f.off))),
+  });
   const close = () => { setEditing(null); setAbsent(null); void reload(); };
   return (
     <>
       <p className="mb-3 text-sm text-muted">New leads go only to people on duty now. If nobody is, leads are shared as usual, so none are left waiting. Today is {data.today}.</p>
-      {!data.people.length ? <Empty title="Nobody to manage">People who report to you appear here.</Empty> : (
+      {!!data.people.length && (
+        <FilterBar search={<SearchBox placeholder="Search name or team" value={f.q} onChange={(q) => set({ q })} />} activeCount={activeCount} onClear={clear} shown={people.length} total={data.people.length} noun="people">
+          <FilterPill label="Now" value={f.state} options={Object.entries(STATE).map(([value, [label]]) => ({ value, label }))} onChange={(state) => set({ state })} />
+          <FilterPill label="Role" value={f.role} options={[...new Set<string>(data.people.map((p: any) => p.role))].map((r) => ({ value: r, label: ROLE_LABELS[r as keyof typeof ROLE_LABELS] }))} onChange={(role) => set({ role })} />
+          <FilterPill label="Team" value={f.team} options={optionsFrom<any>(data.people, (p) => p.team)} onChange={(team) => set({ team })} />
+          <FilterPill label="Weekly off" value={f.off} options={[...WEEKDAYS.map((d, i) => ({ value: String(i), label: d })), { value: 'none', label: 'No weekly off set' }]} onChange={(off) => set({ off })} />
+        </FilterBar>
+      )}
+      {!data.people.length ? <Empty title="Nobody to manage">People who report to you appear here.</Empty> : !people.length ? <Empty title="Nobody matches">Change or reset the filters.</Empty> : (
         <Card className="divide-y divide-line">
-          {data.people.map((p: any) => {
+          {people.map((p: any) => {
             const [label, tone] = STATE[p.state] ?? STATE.on;
             return (
               <div key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">

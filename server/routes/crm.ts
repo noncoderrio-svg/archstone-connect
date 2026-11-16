@@ -473,6 +473,7 @@ crm.post('/leads/:id/erase', requirePermission('lead.delete'), (req, res) => {
 crm.post('/leads/:id/tasks', (req, res) => {
   const lead = workableLead(req.user, id(req.params.id));
   const body = z.object({ type: z.string().min(2).max(30), due_at: z.string().min(10), notes: z.string().max(500).optional() }).parse(req.body);
+  if (Number.isNaN(Date.parse(`${body.due_at.replace(' ', 'T').slice(0, 19)}Z`))) throw new HttpError(400, 'That follow-up date and time is not valid.');
   const owner = lead.owner_id ?? req.user.id;
   run('INSERT INTO tasks(lead_id, owner_id, type, due_at, notes) VALUES(?, ?, ?, ?, ?)', lead.id, owner, body.type, body.due_at, body.notes ?? '');
   logActivity(lead.id, 'task', `Follow-up set: ${body.type}`, body.notes ?? '', req.user.id);

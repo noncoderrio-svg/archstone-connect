@@ -90,7 +90,7 @@ function briefItems(userId: number, userScope: ReturnType<typeof leadScope>) {
   if (unanswered) items.push(`Call ${unanswered} new lead${unanswered > 1 ? 's' : ''} waiting for a first response.`);
   const unread = count(`SELECT COUNT(*) n FROM leads l WHERE ${userScope.sql} AND l.owner_id = ? AND l.unread_count > 0`, ...userScope.params, userId);
   if (unread) items.push(`Reply to ${unread} WhatsApp conversation${unread > 1 ? 's' : ''}.`);
-  const visits = count(`SELECT COUNT(*) n FROM site_visits v WHERE v.host_id = ? AND v.status = 'Scheduled' AND date(v.scheduled_at) = date(?)`, userId, now);
+  const visits = count(`SELECT COUNT(*) n FROM site_visits v WHERE v.host_id = ? AND v.status IN ('Scheduled','Confirmed') AND date(v.scheduled_at) = date(?)`, userId, now);
   if (visits) items.push(`Prepare for ${visits} site visit${visits > 1 ? 's' : ''} today.`);
   const hot = all<{ name: string }>(
     `SELECT l.name FROM leads l WHERE ${userScope.sql} AND l.owner_id = ? AND l.temperature = 'Hot' AND l.stage NOT IN ('Booked','Lost') ORDER BY l.score DESC LIMIT 3`,
@@ -118,7 +118,7 @@ insights.get('/leads/:id/next-action', (req, res) => {
     intent: lead.intent,
     overdueTasks: openTasks.filter((t) => t.due_at < nowIso()).length,
     hasOpenTask: openTasks.length > 0,
-    hasUpcomingVisit: Boolean(get(`SELECT 1 AS x FROM site_visits WHERE lead_id = ? AND status = 'Scheduled'`, lead.id)),
+    hasUpcomingVisit: Boolean(get(`SELECT 1 AS x FROM site_visits WHERE lead_id = ? AND status IN ('Scheduled','Confirmed')`, lead.id)),
     windowOpen: windowOpen(lead),
     hasBooking: Boolean(get(`SELECT 1 AS x FROM bookings WHERE lead_id = ? AND status = 'active'`, lead.id)),
     documents: get<{ n: number }>('SELECT COUNT(*) n FROM documents WHERE lead_id = ?', lead.id)!.n,
@@ -158,7 +158,7 @@ insights.get('/calendar', (req, res) => {
   const visits = all(
     `SELECT v.id, v.lead_id, 'Site visit' AS title, v.scheduled_at AS at, l.name AS lead_name, p.name AS owner, 'visit' AS kind
      FROM site_visits v JOIN leads l ON l.id = v.lead_id JOIN projects p ON p.id = v.project_id
-     WHERE ${scope.sql} AND v.status IN ('Scheduled','Checked In') AND v.scheduled_at BETWEEN ? AND ?`,
+     WHERE ${scope.sql} AND v.status IN ('Scheduled','Confirmed','Checked In') AND v.scheduled_at BETWEEN ? AND ?`,
     ...scope.params, `${q.from} 00:00:00`, `${q.to} 23:59:59`,
   );
   res.json({ events: [...tasks, ...visits] });

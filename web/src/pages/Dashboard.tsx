@@ -280,7 +280,7 @@ export default function Dashboard() {
                     <span className="block truncate font-medium text-ink">{v.lead_name}</span>
                     <span className="block truncate text-[13px] text-muted">{timeOnly(v.scheduled_at)} · {v.project_name}</span>
                   </span>
-                  <Badge tone={v.status === 'Scheduled' ? 'brand' : 'green'}>{v.status}</Badge>
+                  <Badge tone={['Scheduled', 'Confirmed'].includes(v.status) ? 'brand' : 'green'}>{v.status}</Badge>
                 </Link>
               </li>
             ))}

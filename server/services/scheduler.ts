@@ -45,7 +45,7 @@ export function checkResponseSla() {
 export async function sendVisitReminders() {
   const due = all<any>(
     `SELECT l.*, v.scheduled_at, v.otp, v.id AS visit_id FROM site_visits v JOIN leads l ON l.id = v.lead_id
-     WHERE v.status = 'Scheduled' AND v.reminder_sent = 0 AND v.scheduled_at <= ? AND v.scheduled_at > ?`,
+     WHERE v.status IN ('Scheduled','Confirmed') AND v.reminder_sent = 0 AND v.scheduled_at <= ? AND v.scheduled_at > ?`,
     minutesFromNow(1440), nowIso(),
   );
   for (const row of due) {

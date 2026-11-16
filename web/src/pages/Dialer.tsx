@@ -1,11 +1,11 @@
-import { ArrowLeft, Mail, MessageCircle, MessageSquareText, Phone, PhoneForwarded, Shuffle, Upload } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Mail, MessageCircle, MessageSquareText, Phone, PhoneForwarded, Shuffle, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DISPOSITIONS, isLeadRole } from '../../../shared/domain.ts';
 import { FilterBar, FilterPill, SearchBox, filterRows, optionsFrom, useFilters } from '../components/Filters.tsx';
 import { Page } from '../components/Layout.tsx';
 import { EraseButton } from '../components/Erase.tsx';
-import { Badge, Button, Card, Empty, ErrorNote, Modal, Notice, PageHeader, Select, Spinner, TempBadge, TextField, Textarea, cx, useAction } from '../components/ui.tsx';
+import { Badge, Button, Card, Empty, ErrorNote, Input, Modal, Notice, PageHeader, Select, Spinner, TempBadge, TextField, Textarea, cx, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { callSeconds, emailLink, placeCall, smsLink } from '../lib/calling.ts';
@@ -213,11 +213,21 @@ function ResplitModal({ list, onClose }: { list: any; onClose: () => void }) {
   );
 }
 
+const at = (daysAhead: number, hour: number) => { const d = new Date(Date.now() + daysAhead * 86400000); d.setHours(hour, 0, 0, 0); return d; };
 const FOLLOW_UPS = [
+  { label: 'In 1 hour', at: () => new Date(Date.now() + 3600000) },
   { label: 'In 2 hours', at: () => new Date(Date.now() + 2 * 3600000) },
-  { label: 'Tomorrow 11 am', at: () => { const d = new Date(Date.now() + 86400000); d.setHours(11, 0, 0, 0); return d; } },
-  { label: 'In 3 days', at: () => new Date(Date.now() + 3 * 86400000) },
+  { label: 'This evening 6 pm', at: () => at(0, 18), hide: () => new Date().getHours() >= 17 },
+  { label: 'Tomorrow 11 am', at: () => at(1, 11) },
+  { label: 'In 3 days', at: () => at(3, 11) },
+  { label: 'Next week', at: () => at(7, 11) },
 ];
+/** What the follow-up is for, chosen with a custom date and time. */
+const FOLLOW_UP_TYPES = ['Call back', 'WhatsApp', 'Meeting', 'Site visit reminder', 'Send documents'];
+/** "2026-11-16T14:30" for a datetime-local box, in the phone's own time. */
+const localInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+/** Results that mean the customer must be called again, so a follow-up is required. */
+const NEEDS_FOLLOW_UP = ['Call Back', 'Busy', 'Tentative'];
 
 function Session({ list, onExit }: { list: number | null; onExit: () => void }) {
   const [skip, setSkip] = useState(0);
@@ -225,7 +235,8 @@ function Session({ list, onExit }: { list: number | null; onExit: () => void }) 
   const [calling, setCalling] = useState(false);
   const [outcome, setOutcome] = useState('');
   const [notes, setNotes] = useState('');
-  const [followUp, setFollowUp] = useState(-1);
+  const [followUp, setFollowUp] = useState(-1); // -1 none, -2 custom date and time, otherwise a quick choice
+  const [custom, setCustom] = useState({ when: '', type: 'Call back' });
   const [script, setScript] = useState(false);
   const { busy, run } = useAction();
 
@@ -248,18 +259,24 @@ function Session({ list, onExit }: { list: number | null; onExit: () => void }) 
     if (await run(async () => { await placeCall(lead.id, lead.phone); return true; })) setCalling(true);
   };
   const touch = (channel: string) => run(() => api.post(`/leads/${lead.id}/touch`, { channel }));
+  const dueDate = followUp === -2 ? (custom.when ? new Date(custom.when) : null) : followUp >= 0 ? FOLLOW_UPS[followUp].at() : null;
+  const followUpProblem =
+    followUp === -2 && !custom.when ? 'Choose the date and time.'
+    : dueDate && dueDate.getTime() < Date.now() - 60000 ? 'That time has already passed.'
+    : !dueDate && NEEDS_FOLLOW_UP.includes(outcome) ? `"${outcome}" needs a follow-up. Pick when to call again.`
+    : '';
   const save = async () => {
     const connected = ['Connected', 'Qualified', 'Call Back', 'Not Interested'].includes(outcome);
     const seconds = callSeconds();
     const ok = await run(async () => {
       await api.post(`/leads/${lead.id}/call`, { disposition: outcome, notes, duration_seconds: connected ? seconds : undefined });
-      if (followUp >= 0) {
-        await api.post(`/leads/${lead.id}/tasks`, { type: 'Call back', due_at: localToUtc(FOLLOW_UPS[followUp].at().toISOString()), notes });
+      if (dueDate) {
+        await api.post(`/leads/${lead.id}/tasks`, { type: followUp === -2 ? custom.type : 'Call back', due_at: localToUtc(dueDate.toISOString()), notes });
       }
       return true;
     });
     if (ok) {
-      setCalling(false); setOutcome(''); setNotes(''); setFollowUp(-1); setScript(false); setSkip(0);
+      setCalling(false); setOutcome(''); setNotes(''); setFollowUp(-1); setCustom({ when: '', type: 'Call back' }); setScript(false); setSkip(0);
       void reload();
     }
   };
@@ -307,12 +324,24 @@ function Session({ list, onExit }: { list: number | null; onExit: () => void }) 
             <Textarea aria-label="Call notes" className="mt-2" rows={2} placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             <p className="mt-2 mb-1 text-[13px] font-medium">Follow up</p>
             <div className="flex flex-wrap gap-1.5">
-              {FOLLOW_UPS.map((o, i) => (
+              {FOLLOW_UPS.map((o, i) => (o.hide?.() ? null : (
                 <button key={o.label} aria-pressed={followUp === i} onClick={() => setFollowUp(followUp === i ? -1 : i)}
                   className={cx('rounded-full border px-2.5 py-1 text-[13px]', followUp === i ? 'border-brand bg-brand-soft font-medium text-brand-ink' : 'border-line')}>{o.label}</button>
-              ))}
+              )))}
+              <button aria-pressed={followUp === -2} onClick={() => setFollowUp(followUp === -2 ? -1 : -2)}
+                className={cx('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px]', followUp === -2 ? 'border-brand bg-brand-soft font-medium text-brand-ink' : 'border-line')}><CalendarClock size={13} />Pick date & time</button>
             </div>
-            <Button variant="primary" className="mt-3 h-11 w-full" busy={busy} disabled={!outcome} onClick={save}>Save and next lead</Button>
+            {followUp === -2 && (
+              <div className="mt-2 grid grid-cols-[1fr_auto] gap-2">
+                <Input type="datetime-local" aria-label="Follow-up date and time" min={localInput(new Date())} value={custom.when} onChange={(e) => setCustom({ ...custom, when: e.target.value })} />
+                <Select aria-label="Follow-up type" value={custom.type} onChange={(e) => setCustom({ ...custom, type: e.target.value })}>
+                  {FOLLOW_UP_TYPES.map((t) => <option key={t}>{t}</option>)}
+                </Select>
+              </div>
+            )}
+            {dueDate && !followUpProblem && <p className="mt-1.5 text-[13px] text-muted">Follow-up: {dueDate.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</p>}
+            {outcome && followUpProblem && <p className="mt-1.5 text-[13px] text-red-700 dark:text-red-300">{followUpProblem}</p>}
+            <Button variant="primary" className="mt-3 h-11 w-full" busy={busy} disabled={!outcome || Boolean(followUpProblem)} onClick={save}>Save and next lead</Button>
           </div>
         )}
       </Card>

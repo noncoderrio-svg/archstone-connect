@@ -332,11 +332,12 @@ sales.get('/visits', (req, res) => {
   const scope = leadScope(req.user);
   res.json({
     visits: all(
-      `SELECT v.id, v.lead_id, v.scheduled_at, v.status, v.pickup, v.rating, v.feedback, v.checked_in_at, v.latitude, v.longitude,
+      `SELECT v.id, v.lead_id, v.project_id, v.scheduled_at, v.status, v.pickup, v.rating, v.feedback, v.checked_in_at, v.latitude, v.longitude,
+        v.confirmed_at, v.reschedules, v.next_step, v.closed_at, v.created_at, c.name AS booked_by, l.stage AS lead_stage, l.source AS lead_source,
         (SELECT COUNT(*) FROM site_visits x WHERE x.lead_id = v.lead_id AND x.id < v.id AND x.status IN ('Checked In','Completed')) AS previous_visits,
         l.name AS lead_name, p.name AS project_name, h.name AS host_name
        FROM site_visits v JOIN leads l ON l.id = v.lead_id JOIN projects p ON p.id = v.project_id
-       LEFT JOIN users h ON h.id = v.host_id WHERE ${scope.sql} ORDER BY v.scheduled_at DESC LIMIT 200`,
+       LEFT JOIN users h ON h.id = v.host_id LEFT JOIN users c ON c.id = v.created_by WHERE ${scope.sql} ORDER BY v.scheduled_at DESC LIMIT 2000`,
       ...scope.params,
     ),
   });
@@ -392,7 +393,7 @@ sales.post('/visits/:id/checkin', requirePermission('visit.checkin'), (req, res)
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),
   }).parse(req.body);
-  if (v.status !== 'Scheduled') throw new HttpError(409, 'This visit is not awaiting check-in.');
+  if (!['Scheduled', 'Confirmed'].includes(v.status)) throw new HttpError(409, 'This visit is not awaiting check-in.');
   if (b.override_reason) {
     if (!['admin', 'site_head'].includes(req.user.role)) throw new HttpError(403, 'Only a site head can check in without an OTP.');
     audit(req, 'visit.override_checkin', 'visit', v.id, b.override_reason);
@@ -409,16 +410,64 @@ sales.post('/visits/:id/checkin', requirePermission('visit.checkin'), (req, res)
   res.json({ ok: true });
 });
 
+const validTime = (value?: string) => Boolean(value) && !Number.isNaN(Date.parse(`${value!.replace(' ', 'T').slice(0, 19)}Z`));
+
+/** The customer said yes to the visit (usually the day before). */
+sales.post('/visits/:id/confirm', (req, res) => {
+  const v = visitFor(req.user, Number(req.params.id));
+  if (v.status !== 'Scheduled') throw new HttpError(409, 'Only a scheduled visit can be confirmed.');
+  run(`UPDATE site_visits SET status = 'Confirmed', confirmed_at = ? WHERE id = ?`, nowIso(), v.id);
+  logActivity(v.lead_id, 'visit', 'Customer confirmed the site visit', formatIst(v.scheduled_at), req.user.id);
+  broadcast('visits');
+  res.json({ ok: true });
+});
+
+/** A new date and time. The same code stays valid, and the customer is sent the new time. */
+sales.post('/visits/:id/reschedule', async (req, res) => {
+  const v = visitFor(req.user, Number(req.params.id));
+  const b = z.object({ scheduled_at: z.string().min(16).max(19), reason: z.string().trim().max(200).default('') }).parse(req.body);
+  if (!['Scheduled', 'Confirmed', 'No Show'].includes(v.status)) throw new HttpError(409, 'This visit can no longer be rescheduled. Book a new visit instead.');
+  if (!validTime(b.scheduled_at)) throw new HttpError(400, 'That date and time is not valid.');
+  if (Date.parse(`${b.scheduled_at.replace(' ', 'T').slice(0, 19)}Z`) < Date.now() - 5 * 60000) throw new HttpError(400, 'Choose a time in the future.');
+  tx(() => {
+    run(`UPDATE site_visits SET scheduled_at = ?, status = 'Scheduled', confirmed_at = NULL, reminder_sent = 0, reschedules = reschedules + 1 WHERE id = ?`, b.scheduled_at, v.id);
+    // The matching open "Site Visit" follow-up moves too, so reminders follow the new time.
+    run(`UPDATE tasks SET due_at = ?, reminded = 0, overdue_alerts = 0 WHERE lead_id = ? AND type = 'Site Visit' AND completed_at IS NULL AND due_at = ?`, b.scheduled_at, v.lead_id, v.scheduled_at);
+    logActivity(v.lead_id, 'visit', 'Site visit rescheduled', `${formatIst(v.scheduled_at)} → ${formatIst(b.scheduled_at)}${b.reason ? `. ${b.reason}` : ''}`, req.user.id);
+  });
+  const lead = get<any>('SELECT * FROM leads WHERE id = ?', v.lead_id)!;
+  const sent = await sendAutomation('visit_confirm', lead, { visit_time: formatIst(b.scheduled_at), otp: v.otp }).catch(() => false);
+  broadcast('visits');
+  res.json({ ok: true, whatsapp_sent: sent });
+});
+
 sales.post('/visits/:id/complete', (req, res) => {
   const v = visitFor(req.user, Number(req.params.id));
   const b = z.object({
     status: z.enum(['Completed', 'No Show', 'Cancelled']),
     rating: z.number().int().min(1).max(5).optional(),
     feedback: z.string().max(1000).default(''),
+    // What happens next, so no visited customer is left without a plan.
+    next_step: z.enum(['', 'follow_up', 'revisit', 'negotiation']).default(''),
+    next_at: z.string().min(16).max(19).optional(),
+    next_type: z.string().trim().min(2).max(30).default('Call back'),
   }).parse(req.body);
+  if (['Completed', 'No Show', 'Cancelled'].includes(v.status)) throw new HttpError(409, 'This visit is already closed.');
   if (b.status === 'Completed' && v.status !== 'Checked In') throw new HttpError(409, 'Check the customer in first.');
-  run('UPDATE site_visits SET status = ?, rating = ?, feedback = ? WHERE id = ?', b.status, b.rating ?? null, b.feedback, v.id);
+  if ((b.next_step === 'follow_up' || b.next_step === 'revisit') && !validTime(b.next_at)) throw new HttpError(400, 'Choose the date and time for the next step.');
+  run('UPDATE site_visits SET status = ?, rating = ?, feedback = ?, next_step = ?, closed_at = ? WHERE id = ?', b.status, b.rating ?? null, b.feedback, b.next_step, nowIso(), v.id);
   logActivity(v.lead_id, 'visit', `Site visit ${b.status.toLowerCase()}`, b.feedback, req.user.id);
+  const owner = get<any>('SELECT owner_id FROM leads WHERE id = ?', v.lead_id)?.owner_id ?? null;
+  if (b.next_step === 'follow_up') {
+    run('INSERT INTO tasks(lead_id, owner_id, type, due_at, notes) VALUES(?, ?, ?, ?, ?)', v.lead_id, owner ?? req.user.id, b.next_type, b.next_at!, 'After site visit');
+    logActivity(v.lead_id, 'task', `Follow-up set: ${b.next_type}`, formatIst(b.next_at!), req.user.id);
+  }
+  if (b.next_step === 'revisit') {
+    const otp = String(randomInt(100000, 1000000));
+    run(`INSERT INTO site_visits(lead_id, project_id, host_id, scheduled_at, otp, pickup, created_by) VALUES(?, ?, ?, ?, ?, ?, ?)`, v.lead_id, v.project_id, owner, b.next_at!, otp, v.pickup, req.user.id);
+    run('INSERT INTO tasks(lead_id, owner_id, type, due_at) VALUES(?, ?, ?, ?)', v.lead_id, owner ?? req.user.id, 'Site Visit', b.next_at!);
+    logActivity(v.lead_id, 'visit', 'Revisit scheduled', formatIst(b.next_at!), req.user.id);
+  }
   if (b.status === 'Cancelled' && v.google_event_id) {
     const lead = get<any>('SELECT owner_id FROM leads WHERE id = ?', v.lead_id);
     const owner = [lead?.owner_id, req.user.id].find((u) => u && isConnected(u));
@@ -426,7 +475,7 @@ sales.post('/visits/:id/complete', (req, res) => {
   }
   if (b.status === 'Completed') {
     const lead = get<any>('SELECT * FROM leads WHERE id = ?', v.lead_id)!;
-    changeStage(lead, 'Site Visit Done', req.user.id);
+    changeStage(lead, b.next_step === 'negotiation' ? 'Working Deal' : 'Site Visit Done', req.user.id);
     void sendAutomation('post_visit', lead).catch(() => false);
   }
   rescore(v.lead_id);
