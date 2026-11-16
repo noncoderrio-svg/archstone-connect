@@ -458,3 +458,12 @@ main .grid > .card:nth-child(n + 7), .card > ul > li:nth-child(n + 7), .card > o
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- Bulletin bar ---------- */
+@keyframes bulletin-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.bulletin-track { animation: bulletin-scroll 40s linear infinite; }
+.bulletin:hover .bulletin-track, .bulletin:focus-within .bulletin-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .bulletin-track { animation: none; }
+  .bulletin-track > [aria-hidden] { display: none; }
+}

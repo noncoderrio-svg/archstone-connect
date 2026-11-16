@@ -121,14 +121,17 @@ test('Sourcing and Closing Managers see their own and their team\'s leads, not e
   assert.ok(own);
 });
 
+/** Leaves out the version 5 workplace permissions, which every role gets by default and are tested on their own below. */
+const older = (actions: string[]) => actions.filter((a) => !['bulletin.view', 'duty.manage', 'kyc.view'].includes(a)).sort();
+
 test('permissions added later reach saved role sets once, by their defaults', async () => {
   const { addNewPermissions } = await import('../server/migrations.ts');
   db.setSetting('permissions_version', 2);
   db.setSetting('role_permissions', { closing_manager: ['lead.create'], sourcing_manager: ['lead.create'] });
   addNewPermissions();
   const saved = db.getSetting('role_permissions', {});
-  assert.deepEqual(saved.closing_manager.sort(), ['lead.create', 'unit.hold']);
-  assert.deepEqual(saved.sourcing_manager.sort(), ['lead.create', 'unit.book', 'unit.hold']);
+  assert.deepEqual(older(saved.closing_manager), ['lead.create', 'unit.hold']);
+  assert.deepEqual(older(saved.sourcing_manager), ['lead.create', 'unit.book', 'unit.hold']);
   // An admin who later takes a permission away keeps that choice.
   db.setSetting('role_permissions', { closing_manager: ['lead.create'] });
   addNewPermissions();
@@ -141,6 +144,18 @@ test('payment permissions reach a saved role set only if it could already manage
   db.setSetting('role_permissions', { sourcing_manager: ['booking.manage'], site_head: ['lead.create'] });
   addNewPermissions();
   const saved = db.getSetting('role_permissions', {});
-  assert.deepEqual(saved.sourcing_manager.sort(), ['booking.manage', 'payment.followup', 'payment.record']);
-  assert.deepEqual(saved.site_head, ['lead.create'], 'an admin had taken bookings away, so payments stay away too');
+  assert.deepEqual(older(saved.sourcing_manager), ['booking.manage', 'payment.followup', 'payment.record']);
+  assert.deepEqual(older(saved.site_head), ['lead.create'], 'an admin had taken bookings away, so payments stay away too');
+});
+
+test('workplace permissions reach saved role sets once: KYC for everyone who opened documents before, duty for managers', async () => {
+  const { addNewPermissions } = await import('../server/migrations.ts');
+  db.setSetting('permissions_version', 4);
+  db.setSetting('role_permissions', { telecaller: ['lead.create'], closing_manager: ['lead.create'], payment_followup: ['payment.record'] });
+  addNewPermissions();
+  const saved = db.getSetting('role_permissions', {});
+  assert.deepEqual(saved.telecaller.sort(), ['bulletin.view', 'kyc.view', 'lead.create']);
+  assert.deepEqual(saved.closing_manager.sort(), ['bulletin.view', 'duty.manage', 'kyc.view', 'lead.create']);
+  assert.deepEqual(saved.payment_followup.sort(), ['bulletin.view', 'kyc.view', 'payment.record']);
+  assert.ok(!saved.telecaller.includes('bulletin.manage'), 'writing bulletins stays with admins');
 });

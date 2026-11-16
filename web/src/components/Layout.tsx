@@ -1,9 +1,10 @@
 import {
   Check, Palette, Activity, AlarmClock, Award, BadgeCheck, Bell, Building2, CalendarCheck, CalendarDays, ChartColumn, FolderOpen, Handshake, Landmark, LayoutDashboard, LogOut, Megaphone, Menu, MessageCircle, Moon, PanelLeftClose, PanelLeftOpen, Phone, ReceiptIndianRupee, Route, Search, Settings, Sparkles, Sun, Users, UserCog, Wallet, WifiOff, X,
+  CalendarClock,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FocusEvent, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BOOKING_ROLES, CLOSING_ROLES, LEAD_ROLES, ROLE_LABELS, type Action } from '../../../shared/domain.ts';
+import { BOOKING_ROLES, CLOSING_ROLES, LEAD_ROLES, ROLE_LABELS, type Action, type FeatureKey } from '../../../shared/domain.ts';
 import { POPUP_KINDS, playChime } from '../lib/alerts.ts';
 import { api, connectLiveUpdates, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -13,11 +14,12 @@ import { enableWebPush, webPushMissing } from '../lib/install.ts';
 import { useConnection } from '../lib/offline.ts';
 import { COLOR_THEMES, useColorTheme } from '../lib/theme.ts';
 import { Assistant, openAssistant } from './Assistant.tsx';
+import { BulletinBar } from './Bulletin.tsx';
 import { CommandPalette } from './Palette.tsx';
 import { Button, IconButton, Input, Logo, cx } from './ui.tsx';
 
 type NavGroup = 'Daily work' | 'Sales' | 'Growth' | 'Admin';
-interface NavItem { to: string; label: string; icon: ReactNode; group: NavGroup; need?: Action; mobile?: boolean; roles?: string[] }
+interface NavItem { to: string; label: string; icon: ReactNode; group: NavGroup; need?: Action; mobile?: boolean; roles?: string[]; show?: (s: { can: (a: Action) => boolean; on: (f: FeatureKey) => boolean }) => boolean }
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={19} />, group: 'Daily work', mobile: true },
@@ -40,6 +42,7 @@ const NAV: NavItem[] = [
   { to: '/reports', label: 'Reports', icon: <ChartColumn size={19} />, group: 'Admin', need: 'reports.view' },
   { to: '/monitor', label: 'Monitor', icon: <Activity size={19} />, group: 'Admin', need: 'whatsapp.monitor' },
   { to: '/team', label: 'Team', icon: <UserCog size={19} />, group: 'Admin', need: 'user.manage' },
+  { to: '/workplace', label: 'Duty & Bulletin', icon: <CalendarClock size={19} />, group: 'Admin', show: ({ can, on }) => (on('duty') && can('duty.manage')) || (on('bulletin') && can('bulletin.manage')) },
   { to: '/settings', label: 'Settings', icon: <Settings size={19} />, group: 'Admin', need: 'settings.manage' },
 ];
 const GROUPS: NavGroup[] = ['Daily work', 'Sales', 'Growth', 'Admin'];
@@ -319,7 +322,7 @@ function Notifications() {
 }
 
 export function Layout() {
-  const { can, user, demoMode, whatsappLive } = useAuth();
+  const { can, on, user, demoMode, whatsappLive } = useAuth();
   const { theme, setTheme, dark, toggleDark: toggle } = useColorTheme();
   const sidebar = useSidebarCollapsed();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -332,7 +335,7 @@ export function Layout() {
     nav(`/leads?q=${encodeURIComponent(query.trim())}`);
     setQuery('');
   };
-  const items = NAV.filter((i) => (!i.need || can(i.need)) && (!i.roles || i.roles.includes(user!.role)));
+  const items = NAV.filter((i) => (!i.need || can(i.need)) && (!i.roles || i.roles.includes(user!.role)) && (!i.show || i.show({ can, on })));
 
   useEffect(() => connectLiveUpdates(), []);
   useEffect(() => keepDeviceRegistered(), []);
@@ -383,6 +386,7 @@ export function Layout() {
           <IconButton label={dark ? 'Use light mode' : 'Use dark mode'} onClick={toggle}>{dark ? <Sun size={19} /> : <Moon size={19} />}</IconButton>
           <Notifications />
         </header>
+        <BulletinBar />
         <main className="scroll-thin min-h-0 flex-1 overflow-y-auto"><div key={location.pathname.split('/')[1]} className="fade-in h-full"><Outlet /></div></main>
         {/* A chat needs the whole screen for its messages and reply box. */}
         {!/^\/inbox\/\d+/.test(location.pathname) && (

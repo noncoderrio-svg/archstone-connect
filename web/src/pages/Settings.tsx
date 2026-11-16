@@ -7,8 +7,9 @@ import { LABEL_COLORS, LabelChip } from '../components/Labels.tsx';
 import { Badge, Button, Card, CardHeader, ErrorNote, IconButton, Input, Modal, Notice, PageHeader, SelectField, Spinner, TextField, cx, useAction } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { dateTime } from '../lib/format.ts';
+import { useAuth } from '../lib/auth.tsx';
 
-const TABS = ['Rules', 'Alerts', 'Workflows', 'Labels', 'Reports', 'Integrations', 'Automations', 'Deleted leads', 'Audit log'] as const;
+const TABS = ['Features', 'Rules', 'Alerts', 'Workflows', 'Labels', 'Reports', 'Integrations', 'Automations', 'Deleted leads', 'Audit log'] as const;
 
 const TRIGGERS = [{ value: 'lead_created', label: 'A new lead arrives' }, { value: 'stage_changed', label: 'A lead moves to a stage' }, { value: 'lead_idle', label: 'A lead goes quiet' }];
 const ACTIONS = [
@@ -141,6 +142,35 @@ function AlertRules({ initial, onSaved }: { initial: any; onSaved: () => void })
         {check('whatsapp_overdue', 'Overdue follow-up')}
       </section>
       <Button variant="primary" busy={busy} onClick={async () => { if (await run(() => api.put('/settings/alerts', f), 'Alert rules saved')) onSaved(); }}>Save</Button>
+    </Card>
+  );
+}
+
+/** Company-wide on/off switches. Who may see and use each one is set on the Permissions screen. */
+function FeatureSwitches() {
+  const { refresh } = useAuth();
+  const { data, error, loading } = useApi('/features');
+  const [f, setF] = useState<Record<string, boolean> | null>(null);
+  const { busy, run } = useAction();
+  useEffect(() => { if (data && !f) setF(data.features); }, [data, f]);
+  if (loading || (!f && !error)) return <Spinner />;
+  if (error || !f) return <ErrorNote>{error}</ErrorNote>;
+  return (
+    <Card className="max-w-2xl p-4">
+      <p className="mb-3 text-sm text-muted">Switch each feature on or off for the whole company. Then choose who can see and use it in Team → Permissions, by role or for one person. A switched-off feature is hidden and refused by the server too.</p>
+      <div className="divide-y divide-line">
+        {data.catalog.map((c: any) => (
+          <label key={c.key} className="flex cursor-pointer items-start gap-3 py-3">
+            <input type="checkbox" className="mt-1 size-4 accent-[var(--brand)]" checked={f[c.key]} onChange={(e) => setF({ ...f, [c.key]: e.target.checked })} />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-ink">{c.label}</span>
+              <span className="block text-[13px] text-muted">{c.hint}</span>
+            </span>
+            <Badge tone={f[c.key] ? 'green' : 'neutral'}>{f[c.key] ? 'On' : 'Off'}</Badge>
+          </label>
+        ))}
+      </div>
+      <Button variant="primary" className="mt-3" busy={busy} onClick={async () => { if (await run(() => api.put('/features', f), 'Features saved')) await refresh(); }}>Save</Button>
     </Card>
   );
 }
@@ -585,26 +615,29 @@ function AuditLog() {
 }
 
 export default function Settings() {
-  const [tab, setTab] = useState<(typeof TABS)[number]>('Rules');
+  const [tab, setTab] = useState<(typeof TABS)[number] | null>(null);
   const { data, error, loading, reload } = useApi('/settings');
   if (loading) return <Spinner />;
   if (error || !data) return <Page><ErrorNote>{error}</ErrorNote></Page>;
+  const tabs = TABS.filter((t) => t !== 'Features' || data.is_admin); // Only an administrator switches features.
+  const current = tab ?? tabs[0];
   return (
     <Page>
       <PageHeader title="Settings" />
       <div className="scroll-thin mb-4 flex gap-1 overflow-x-auto border-b border-line" role="tablist">
-        {TABS.map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-            className={cx('-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap', tab === t ? 'border-brand font-medium text-brand-ink' : 'border-transparent text-muted')}>{t}</button>
+        {tabs.map((t) => (
+          <button key={t} role="tab" aria-selected={current === t} onClick={() => setTab(t)}
+            className={cx('-mb-px border-b-2 px-3 py-2 text-sm whitespace-nowrap', current === t ? 'border-brand font-medium text-brand-ink' : 'border-transparent text-muted')}>{t}</button>
         ))}
       </div>
-      {tab === 'Rules' && <Rules initial={data.settings} />}
-      {tab === 'Alerts' && <AlertRules initial={data.settings.alert_rules} onSaved={reload} />}
-      {tab === 'Workflows' && <Workflows />}
-      {tab === 'Labels' && <LabelSettings />}
-      {tab === 'Reports' && <ReportSchedule settings={data.settings} runs={data.report_runs} onSaved={reload} />}
-      {tab === 'Deleted leads' && <DeletedLeads />}
-      {tab === 'Integrations' && (
+      {current === 'Features' && <FeatureSwitches />}
+      {current === 'Rules' && <Rules initial={data.settings} />}
+      {current === 'Alerts' && <AlertRules initial={data.settings.alert_rules} onSaved={reload} />}
+      {current === 'Workflows' && <Workflows />}
+      {current === 'Labels' && <LabelSettings />}
+      {current === 'Reports' && <ReportSchedule settings={data.settings} runs={data.report_runs} onSaved={reload} />}
+      {current === 'Deleted leads' && <DeletedLeads />}
+      {current === 'Integrations' && (
         <div className="space-y-3">
           <Integrations items={data.integrations} reload={reload} />
           <FirebaseCard firebase={data.firebase} reload={reload} />
@@ -612,8 +645,8 @@ export default function Settings() {
           <p className="text-[13px] text-muted">{data.backup_last ? `Last automatic backup: ${data.backup_last}.` : 'The first automatic backup runs shortly after start-up.'}{data.wa_quality ? ` WhatsApp quality update: ${data.wa_quality.event}.` : ''}</p>
         </div>
       )}
-      {tab === 'Automations' && <Automations items={data.automations} reload={reload} />}
-      {tab === 'Audit log' && <AuditLog />}
+      {current === 'Automations' && <Automations items={data.automations} reload={reload} />}
+      {current === 'Audit log' && <AuditLog />}
     </Page>
   );
 }

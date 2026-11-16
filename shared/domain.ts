@@ -223,6 +223,15 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    group: 'Workplace',
+    items: [
+      ['bulletin.view', 'See the bulletin bar'],
+      ['bulletin.manage', 'Write bulletin messages'],
+      ['duty.manage', 'Set weekly offs, shifts and absences for their team'],
+      ['kyc.view', 'See KYC numbers and open KYC documents'],
+    ],
+  },
+  {
     group: 'Administration',
     items: [
       ['reports.view', 'View reports'],
@@ -236,16 +245,16 @@ export const PERMISSION_GROUPS = [
 export type Action = (typeof PERMISSION_GROUPS)[number]['items'][number][0];
 export const ACTIONS = PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i[0])) as Action[];
 
-const EVERYONE: Action[] = ['lead.create', 'whatsapp.send', 'campaign.create', 'call.office', 'ai.use'];
+const EVERYONE: Action[] = ['lead.create', 'whatsapp.send', 'campaign.create', 'call.office', 'ai.use', 'bulletin.view'];
 
 /** Starting points. An admin can change any of these, by role or for one person. */
 export const PERMISSIONS: Record<Role, Action[]> = {
   admin: [...ACTIONS],
-  site_head: [...EVERYONE, 'unit.hold', 'unit.book', 'payment.record', 'payment.followup', 'lead.reassign', 'inventory.manage', 'partner.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage'],
-  sourcing_manager: [...EVERYONE, 'unit.hold', 'unit.book', 'payment.record', 'payment.followup', 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage'],
-  closing_manager: [...EVERYONE, 'unit.hold', 'lead.reassign', 'approval.review', 'reports.view', 'visit.checkin'],
-  payment_followup: ['ai.use', 'payment.record', 'payment.followup'],
-  telecaller: [...EVERYONE, 'unit.hold'],
+  site_head: [...EVERYONE, 'unit.hold', 'unit.book', 'payment.record', 'payment.followup', 'lead.reassign', 'inventory.manage', 'partner.manage', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'redevelopment.manage', 'media.manage', 'duty.manage', 'kyc.view'],
+  sourcing_manager: [...EVERYONE, 'unit.hold', 'unit.book', 'payment.record', 'payment.followup', 'lead.reassign', 'lead.import', 'lead.export', 'approval.review', 'reports.view', 'visit.checkin', 'booking.manage', 'partner.manage', 'media.manage', 'duty.manage', 'kyc.view'],
+  closing_manager: [...EVERYONE, 'unit.hold', 'lead.reassign', 'approval.review', 'reports.view', 'visit.checkin', 'duty.manage', 'kyc.view'],
+  payment_followup: ['ai.use', 'payment.record', 'payment.followup', 'bulletin.view', 'kyc.view'],
+  telecaller: [...EVERYONE, 'unit.hold', 'kyc.view'],
 };
 
 /**
@@ -255,7 +264,41 @@ export const PERMISSIONS: Record<Role, Action[]> = {
 export const ADDED_ACTIONS: { version: number; actions: Action[]; when?: Action }[] = [
   { version: 3, actions: ['unit.hold', 'unit.book'] },
   { version: 4, actions: ['payment.record', 'payment.followup'], when: 'booking.manage' },
+  // Everyone who could open KYC documents before keeps that; the rest are new.
+  { version: 5, actions: ['bulletin.view', 'duty.manage', 'kyc.view'] },
 ];
+
+/**
+ * Features an admin switches on or off for the whole company in Settings → Features.
+ * Who may see and use each one is then set on the Permissions screen.
+ */
+export const FEATURES = [
+  { key: 'bulletin', label: 'Bulletin bar', hint: 'Scrolling messages under the top bar: targets, launches, offers, birthdays.', default: true },
+  { key: 'duty', label: 'Weekly offs, shifts and duty-aware assignment', hint: 'New leads go only to people on duty today. Absent people can hand their follow-ups to a teammate.', default: false },
+  { key: 'kyc', label: 'KYC number checks', hint: 'Aadhaar is checked and kept as the last 4 digits only. PAN is format-checked. Who opens a lead or a document is logged.', default: true },
+] as const;
+export type FeatureKey = (typeof FEATURES)[number]['key'];
+export type FeatureSwitches = Record<FeatureKey, boolean>;
+export const FEATURE_DEFAULTS = Object.fromEntries(FEATURES.map((f) => [f.key, f.default])) as FeatureSwitches;
+
+export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+/** Verhoeff checksum, the check digit scheme Aadhaar numbers use. */
+const VD = [[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
+const VP = [[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
+export function verhoeffValid(digits: string) {
+  if (!/^\d+$/.test(digits)) return false;
+  let c = 0;
+  [...digits].reverse().forEach((d, i) => { c = VD[c][VP[i % 8][Number(d)]]; });
+  return c === 0;
+}
+/** 12 digits, not starting with 0 or 1, passing the Verhoeff check. Spaces and dashes are ignored. */
+export const aadhaarValid = (raw: string) => {
+  const d = raw.replace(/[\s-]/g, '');
+  return /^[2-9]\d{11}$/.test(d) && verhoeffValid(d);
+};
+/** Five letters, four digits, one letter; the fourth letter says what kind of holder it is. */
+export const panValid = (raw: string) => /^[A-Z]{3}[ABCFGHLJPTK][A-Z]\d{4}[A-Z]$/.test(raw.trim().toUpperCase());
 
 /** Monthly goals. Each role is measured on its own work. */
 export const GOALS = {

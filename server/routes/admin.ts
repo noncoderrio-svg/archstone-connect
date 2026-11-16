@@ -13,6 +13,7 @@ import { all, db, get, getSetting, nowIso, run, setSetting, tx } from '../db.ts'
 import { alertRules, quietStatus } from '../services/alerts.ts';
 import { writeBackup } from '../services/backup.ts';
 import { connectionList, saveConnection } from '../services/connections.ts';
+import { features } from '../services/workplace.ts';
 import { dataDir } from '../services/secrets.ts';
 import { audit, leadScope, subscribe } from '../services/core.ts';
 import {
@@ -97,6 +98,7 @@ admin.get('/auth/me', (req, res) => {
     telephonyLive: telephonyLive(),
     aiEnabled: Boolean(config.gemini.key),
     mustSetupTwoFactor: adminNeedsTwoFactor(req.user),
+    features: features(),
   });
 });
 

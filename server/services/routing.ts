@@ -1,4 +1,5 @@
 import { all, get, nowIso, run } from '../db.ts';
+import { preferOnDuty } from './workplace.ts';
 
 /** Decides who gets a lead, from the campaign, ad set, ad or form it came through. */
 export interface RouteInput {
@@ -37,8 +38,14 @@ export function nextFromRoute(route: Route) {
     .map((id) => get<{ id: number; role: string }>(`SELECT id, role FROM users WHERE id = ? AND status = 'active'`, id))
     .filter((u): u is { id: number; role: string } => Boolean(u));
   if (!members.length) return null;
-  if (route.mode === 'workload') return [...members].sort((a, b) => openLeads(a.id) - openLeads(b.id))[0];
-  const person = members[route.next_index % members.length];
-  run('UPDATE lead_routes SET next_index = ?, last_used_at = ? WHERE id = ?', (route.next_index + 1) % Math.max(members.length, 1), nowIso(), route.id);
-  return person;
+  // People on duty first (when that feature is on). Anyone off duty is skipped this time round.
+  const working = new Set(preferOnDuty(members).map((m) => m.id));
+  if (route.mode === 'workload') return members.filter((m) => working.has(m.id)).sort((a, b) => openLeads(a.id) - openLeads(b.id))[0];
+  for (let step = 0; step < members.length; step++) {
+    const index = (route.next_index + step) % members.length;
+    if (!working.has(members[index].id)) continue;
+    run('UPDATE lead_routes SET next_index = ?, last_used_at = ? WHERE id = ?', (index + 1) % members.length, nowIso(), route.id);
+    return members[index];
+  }
+  return null;
 }

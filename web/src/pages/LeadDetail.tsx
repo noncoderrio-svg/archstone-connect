@@ -10,7 +10,7 @@ import { openAssistant } from '../components/Assistant.tsx';
 import { LabelButton, LabelChip, useLabels } from '../components/Labels.tsx';
 import { Page } from '../components/Layout.tsx';
 import {
-  Badge, Button, Card, CardHeader, Empty, ErrorNote, Modal, Notice, Select, SelectField, Spinner, TempBadge, TextField, Textarea, TextareaField, useAction, useToast,
+  Badge, Input, Button, Card, CardHeader, Empty, ErrorNote, Modal, Notice, Select, SelectField, Spinner, TempBadge, TextField, Textarea, TextareaField, useAction, useToast,
 } from '../components/ui.tsx';
 import { api, useApi } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -239,8 +239,50 @@ function CostSheetModal({ lead, onClose }: { lead: any; onClose: () => void }) {
   );
 }
 
+/** PAN and Aadhaar numbers. Aadhaar is checked, then only its last 4 digits are kept. Every look is logged. */
+function KycNumbers({ leadId }: { leadId: number }) {
+  const { data, reload } = useApi(`/leads/${leadId}/kyc`);
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState({ pan: '', aadhaar: '' });
+  const { busy, run } = useAction();
+  if (!data) return null;
+  const save = async () => {
+    const body: Record<string, string> = {};
+    if (f.pan.trim()) body.pan = f.pan;
+    if (f.aadhaar.trim()) body.aadhaar = f.aadhaar;
+    if (await run(() => api.put(`/leads/${leadId}/kyc`, body), 'KYC details saved')) { setEditing(false); setF({ pan: '', aadhaar: '' }); void reload(); }
+  };
+  const remove = (field: 'pan' | 'aadhaar') => run(async () => { await api.put(`/leads/${leadId}/kyc`, { [field]: null }); await reload(); }, 'Removed');
+  return (
+    <div className="border-b border-line px-4 pb-3">
+      <dl className="space-y-1.5">
+        {([['PAN', 'pan'], ['Aadhaar', 'aadhaar']] as const).map(([label, field]) => (
+          <div key={field} className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <dt className="text-xs text-muted">{label}</dt>
+              <dd className="font-mono text-sm whitespace-nowrap text-ink">{data[field] || '—'}</dd>
+            </div>
+            {data[field] && <Button size="sm" variant="ghost" onClick={() => remove(field)}>Remove</Button>}
+          </div>
+        ))}
+      </dl>
+      {data.aadhaar_also_on.length > 0 && (
+        <p className="mt-1 text-[13px] text-amber-800 dark:text-amber-300">The same Aadhaar is on {data.aadhaar_also_on.map((id: number, i: number) => <span key={id}>{i ? ', ' : ''}<Link className="underline" to={`/leads/${id}`}>lead {id}</Link></span>)}.</p>
+      )}
+      {editing ? (
+        <div className="mt-2 space-y-2">
+          <Input aria-label="PAN" placeholder="PAN, e.g. ABCPE1234F" maxLength={10} className="uppercase" value={f.pan} onChange={(e) => setF({ ...f, pan: e.target.value })} />
+          <Input aria-label="Aadhaar number" placeholder="Aadhaar, 12 digits" inputMode="numeric" maxLength={14} autoComplete="off" value={f.aadhaar} onChange={(e) => setF({ ...f, aadhaar: e.target.value })} />
+          <p className="text-xs text-muted">Only the last 4 Aadhaar digits are kept. Leave a box empty to keep what is saved.</p>
+          <div className="flex gap-2"><Button size="sm" variant="primary" busy={busy} onClick={save}>Save</Button><Button size="sm" onClick={() => setEditing(false)}>Cancel</Button></div>
+        </div>
+      ) : <Button size="sm" className="mt-2" onClick={() => setEditing(true)}>Add or change</Button>}
+    </div>
+  );
+}
+
 function Documents({ leadId, documents, onChange }: { leadId: number; documents: any[]; onChange: () => void }) {
-  const { can, user } = useAuth();
+  const { can, on, user } = useAuth();
   const [removing, setRemoving] = useState<any>(null);
   const [type, setType] = useState<string>(DOCUMENT_TYPES[0]);
   const input = useRef<HTMLInputElement>(null);
@@ -262,6 +304,7 @@ function Documents({ leadId, documents, onChange }: { leadId: number; documents:
   return (
     <Card>
       <CardHeader title="KYC and documents" hint="Stored encrypted. PDF, JPG or PNG, up to 10 MB." />
+      {on('kyc') && can('kyc.view') && <KycNumbers leadId={leadId} />}
       <div className="flex gap-2 px-4 pb-3">
         <Select aria-label="Document type" value={type} onChange={(e) => setType(e.target.value)}>{DOCUMENT_TYPES.map((t) => <option key={t}>{t}</option>)}</Select>
         <input ref={input} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" aria-label="Choose a document" onChange={(e) => upload(e.target.files?.[0])} />
@@ -271,7 +314,9 @@ function Documents({ leadId, documents, onChange }: { leadId: number; documents:
         {documents.map((d) => (
           <li key={d.id} className="px-4 py-2">
             <div className="flex items-center justify-between gap-2">
-              <a href={`/api/documents/${d.id}/file`} className="min-w-0 truncate text-sm font-medium text-ink hover:underline"><Download size={13} className="mr-1 inline" />{d.type}</a>
+              {can('kyc.view')
+                ? <a href={`/api/documents/${d.id}/file`} className="min-w-0 truncate text-sm font-medium text-ink hover:underline"><Download size={13} className="mr-1 inline" />{d.type}</a>
+                : <span className="min-w-0 truncate text-sm font-medium text-ink" title="You do not have permission to open KYC documents">{d.type}</span>}
               <Badge tone={d.status === 'verified' ? 'green' : d.status === 'rejected' ? 'red' : 'amber'}>{d.status}</Badge>
             </div>
             <p className="truncate text-xs text-muted">{d.filename} · {d.uploaded_by_name}{d.in_drive ? ' · In Drive' : ''}</p>

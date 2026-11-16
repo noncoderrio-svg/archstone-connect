@@ -243,7 +243,7 @@ postsales.post('/leads/:id/documents', express.raw({ type: () => true, limit: MA
   res.status(201).json({ id: r.id });
 });
 
-postsales.get('/documents/:id/file', (req, res) => {
+postsales.get('/documents/:id/file', requirePermission('kyc.view'), (req, res) => {
   const d = documentFor(req.user, Number(req.params.id));
   audit(req, 'document.view', 'document', d.id, d.type);
   res.setHeader('Content-Type', d.mime);

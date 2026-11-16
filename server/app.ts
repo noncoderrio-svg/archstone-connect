@@ -22,6 +22,7 @@ import { postsales, publicBuyer } from './routes/postsales.ts';
 import { routing } from './routes/routing.ts';
 import { sales } from './routes/sales.ts';
 import { webhooks } from './routes/webhooks.ts';
+import { workplace } from './routes/workplace.ts';
 import { config } from './config.ts';
 import { tickOnce } from './services/scheduler.ts';
 
@@ -80,7 +81,7 @@ export function createApp() {
   });
   app.use('/api', rateLimit(1200), publicAuth, publicGoogle);
   app.use('/public', rateLimit(600), publicMedia, publicBuyer);
-  app.use('/api', requireAuth, erase, admin, control, insights, dialer, account, postsales, payments, partners, growth, routing, crm, sales, messaging);
+  app.use('/api', requireAuth, erase, admin, control, insights, dialer, account, postsales, payments, partners, growth, routing, crm, sales, messaging, workplace);
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found.')));
 
   const dist = resolve('dist');

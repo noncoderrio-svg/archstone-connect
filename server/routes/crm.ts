@@ -11,6 +11,7 @@ import { assignLead, changeStage, ingestLead, logActivity, markResponded, nextTe
 import { draftReply, summarize } from '../services/ai.ts';
 import { sendAutomation } from '../services/whatsapp.ts';
 import { eraseDocuments } from './postsales.ts';
+import { featureOn } from '../services/workplace.ts';
 
 export const crm = Router();
 
@@ -190,6 +191,10 @@ crm.post('/leads/import', requirePermission('lead.import'), (req, res) => {
 // ---------- Lead 360 ----------
 crm.get('/leads/:id', (req, res) => {
   const lead = visibleLead(req.user, id(req.params.id));
+  // Who opened which customer, at most once per person per lead every 30 minutes.
+  if (featureOn('kyc') && !get(`SELECT 1 AS x FROM audit_log WHERE action = 'lead.view' AND actor_id = ? AND entity_id = ? AND created_at > ?`, req.user.id, String(lead.id), minutesFromNow(-30))) {
+    audit(req, 'lead.view', 'lead', lead.id);
+  }
   const project = lead.project_id ? get('SELECT * FROM projects WHERE id = ?', lead.project_id) : null;
   res.json({
     lead: presentLead(req.user, {

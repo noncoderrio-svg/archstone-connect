@@ -2,6 +2,7 @@ import { ALERT_DEFAULTS, type AlertKind } from '../../shared/domain.ts';
 import { get, getSetting, run } from '../db.ts';
 import { notify } from './core.ts';
 import { sendToStaff } from './whatsapp.ts';
+import { offDutyNow } from './workplace.ts';
 
 export type AlertRules = typeof ALERT_DEFAULTS;
 export interface AlertPrefs { push: Partial<Record<AlertKind, boolean>>; whatsapp: Partial<Record<AlertKind, boolean>> }
@@ -47,7 +48,7 @@ export function alertUser(
   if (!userId) return;
   const rules = alertRules();
   const prefs = alertPrefs(userId);
-  const quiet = isQuietNow(rules);
+  const quiet = isQuietNow(rules) || offDutyNow(userId); // Off duty: the bell only, never a phone alert on a day off.
   notify(userId, title, body, link, { kind, push: !quiet && prefs.push[kind] !== false });
 
   const rule = WHATSAPP_RULE[kind];

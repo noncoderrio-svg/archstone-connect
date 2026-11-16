@@ -124,8 +124,10 @@ export function phoneMasked(user: SessionUser) {
 
 export function presentLead<T extends { phone: string; labels?: string }>(user: SessionUser, lead: T) {
   const masked = phoneMasked(user);
+  // KYC numbers never travel with the lead; they have their own permission-checked request.
+  const { kyc_pan_enc: _p, kyc_aadhaar_hash: _h, kyc_aadhaar_last4: _l, ...rest } = lead as T & Record<string, unknown>;
   return {
-    ...lead,
+    ...(rest as T),
     phone: masked ? maskPhone(lead.phone) : lead.phone,
     phone_masked: masked,
     labels: lead.labels ? JSON.parse(lead.labels) : [],

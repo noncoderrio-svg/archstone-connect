@@ -21,6 +21,7 @@ const Approvals = lazyPage(() => import('./pages/Approvals.tsx'));
 const Reports = lazyPage(() => import('./pages/Reports.tsx'));
 const Team = lazyPage(() => import('./pages/Team.tsx'));
 const Settings = lazyPage(() => import('./pages/Settings.tsx'));
+const Workplace = lazyPage(() => import('./pages/Workplace.tsx'));
 const Account = lazyPage(() => import('./pages/Account.tsx'));
 const Calendar = lazyPage(() => import('./pages/Calendar.tsx'));
 const FollowUps = lazyPage(() => import('./pages/FollowUps.tsx'));
@@ -86,6 +87,7 @@ function Root() {
           <Route path="reports" element={<Lazy><Reports /></Lazy>} />
           <Route path="team" element={<Lazy><Team /></Lazy>} />
           <Route path="settings" element={<Lazy><Settings /></Lazy>} />
+          <Route path="workplace" element={<Lazy><Workplace /></Lazy>} />
           <Route path="account" element={<Lazy><Account /></Lazy>} />
           <Route path="calendar" element={<Lazy><Calendar /></Lazy>} />
           <Route path="followups" element={<Lazy><FollowUps /></Lazy>} />

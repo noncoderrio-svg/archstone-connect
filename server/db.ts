@@ -550,7 +550,32 @@ CREATE TABLE IF NOT EXISTS payment_followups (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_payment_followups ON payment_followups(payment_id);
+CREATE TABLE IF NOT EXISTS absences (
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  marked_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, date)
+);
+CREATE TABLE IF NOT EXISTS bulletins (
+  id INTEGER PRIMARY KEY,
+  text TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'news',
+  starts_on TEXT NOT NULL,
+  ends_on TEXT NOT NULL,
+  roles TEXT NOT NULL DEFAULT '[]',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
+addColumn('users', 'weekly_off', `TEXT NOT NULL DEFAULT ''`);
+addColumn('users', 'shift_start', `TEXT NOT NULL DEFAULT ''`);
+addColumn('users', 'shift_end', `TEXT NOT NULL DEFAULT ''`);
+addColumn('leads', 'kyc_pan_enc', `TEXT NOT NULL DEFAULT ''`);
+addColumn('leads', 'kyc_aadhaar_last4', `TEXT NOT NULL DEFAULT ''`);
+addColumn('leads', 'kyc_aadhaar_hash', `TEXT NOT NULL DEFAULT ''`);
 
 type Row = Record<string, any>;
 type Params = SQLInputValue[];

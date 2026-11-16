@@ -3,6 +3,7 @@ import { all, get, getSetting, nowIso, run, tx } from '../db.ts';
 import { alertUser } from './alerts.ts';
 import { broadcast, normalizePhone, notify } from './core.ts';
 import { matchRoute, nextFromRoute } from './routing.ts';
+import { assignmentExclusions } from './workplace.ts';
 import { runWorkflows } from './workflows.ts';
 
 export interface LeadInput {
@@ -71,17 +72,26 @@ export function nextTelecaller(projectId?: number | null, language?: string, exc
   const order = getSetting<string>('routing_mode', 'round_robin') === 'workload'
     ? `(SELECT COUNT(*) FROM leads o WHERE o.owner_id = u.id AND o.deleted_at IS NULL AND o.stage NOT IN ('Booked','Lost','Unqualified')) ASC, u.id ASC`
     : `COALESCE(u.last_assigned_at, '') ASC, u.id ASC`;
+  let skip: number[] = [];
   const pick = (extra: string, ...p: (number | string)[]) =>
-    get<{ id: number }>(`SELECT u.id FROM users u WHERE u.role = 'telecaller' AND u.status = 'active' AND u.id != ? ${extra} ORDER BY ${order} LIMIT 1`, excludeId ?? 0, ...p);
+    get<{ id: number }>(
+      `SELECT u.id FROM users u WHERE u.role = 'telecaller' AND u.status = 'active' AND u.id != ? ${skip.length ? `AND u.id NOT IN (${skip.join(',')})` : ''} ${extra} ORDER BY ${order} LIMIT 1`,
+      excludeId ?? 0, ...p,
+    );
   const onProject = 'AND u.id IN (SELECT user_id FROM user_projects WHERE project_id = ?)';
   const speaks = `AND (u.languages = '' OR ',' || u.languages || ',' LIKE ?)`;
   const lang = `%,${language},%`;
-  return (
-    (projectId && language ? pick(`${onProject} ${speaks}`, projectId, lang) : undefined) ??
-    (language ? pick(speaks, lang) : undefined) ??
-    (projectId ? pick(onProject, projectId) : undefined) ??
-    pick('')
-  );
+  // With duty-aware assignment on, people on duty are tried first, then anyone working today, then everyone.
+  for (const excluded of assignmentExclusions()) {
+    skip = excluded.filter(Number.isInteger);
+    const found =
+      (projectId && language ? pick(`${onProject} ${speaks}`, projectId, lang) : undefined) ??
+      (language ? pick(speaks, lang) : undefined) ??
+      (projectId ? pick(onProject, projectId) : undefined) ??
+      pick('');
+    if (found) return found;
+  }
+  return undefined;
 }
 
 export type IngestResult = { id: number; duplicate: boolean; created: boolean };
