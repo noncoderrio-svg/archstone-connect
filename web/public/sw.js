@@ -40,6 +40,8 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || url.origin !== location.origin) return;
   if (CACHED_API.test(url.pathname)) return event.respondWith(networkFirst(request, DATA));
   if (url.pathname.startsWith('/api') || url.pathname.startsWith('/webhooks') || url.pathname.startsWith('/public')) return;
+  // The Android app file is large and must always be the latest one.
+  if (url.pathname.startsWith('/app/download') || url.pathname.endsWith('.apk')) return;
   if (request.mode === 'navigate') return event.respondWith(networkFirst(request, SHELL, '/'));
   event.respondWith(cacheFirst(request));
 });

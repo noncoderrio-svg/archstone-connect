@@ -5,11 +5,11 @@ import { DatePill, FilterBar, FilterPill, SearchBox, dateBounds, filterRows, use
 import { Page } from '../components/Layout.tsx';
 import { LABEL_COLORS, LabelChip } from '../components/Labels.tsx';
 import { Badge, Button, Card, CardHeader, ErrorNote, IconButton, Input, Modal, Notice, PageHeader, SelectField, Spinner, TextField, cx, useAction } from '../components/ui.tsx';
-import { api, useApi } from '../lib/api.ts';
+import { api, uploadWithProgress, useApi } from '../lib/api.ts';
 import { dateTime } from '../lib/format.ts';
 import { useAuth } from '../lib/auth.tsx';
 
-const TABS = ['Features', 'Rules', 'Alerts', 'Workflows', 'Labels', 'Reports', 'Integrations', 'Automations', 'Deleted leads', 'Audit log'] as const;
+const TABS = ['Features', 'Mobile app', 'Rules', 'Alerts', 'Workflows', 'Labels', 'Reports', 'Integrations', 'Automations', 'Deleted leads', 'Audit log'] as const;
 
 const TRIGGERS = [{ value: 'lead_created', label: 'A new lead arrives' }, { value: 'stage_changed', label: 'A lead moves to a stage' }, { value: 'lead_idle', label: 'A lead goes quiet' }];
 const ACTIONS = [
@@ -172,6 +172,98 @@ function FeatureSwitches() {
       </div>
       <Button variant="primary" className="mt-3" busy={busy} onClick={async () => { if (await run(() => api.put('/features', f), 'Features saved')) await refresh(); }}>Save</Button>
     </Card>
+  );
+}
+
+/** The Android app file staff download from /app, and the iPhone link. Administrators only. */
+function MobileAppSettings() {
+  const { data, error, loading, reload } = useApi('/mobile-app');
+  const [version, setVersion] = useState('');
+  const [notes, setNotes] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [percent, setPercent] = useState<number | null>(null);
+  const [ios, setIos] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const { busy, run } = useAction();
+  if (loading) return <Spinner />;
+  if (error || !data) return <ErrorNote>{error}</ErrorNote>;
+  const mb = (n: number) => `${(n / 1048576).toFixed(1)} MB`;
+  const apk = data.apk;
+  const upload = async () => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.apk')) return run(async () => { throw new Error('Choose the .apk file.'); });
+    if (file.size > data.max_size) return run(async () => { throw new Error(`The file is ${mb(file.size)}. The limit is ${mb(data.max_size)}.`); });
+    setPercent(0);
+    const done = await run(() => uploadWithProgress(`/mobile-app/apk?version=${encodeURIComponent(version)}&notes=${encodeURIComponent(notes)}`, file, setPercent), 'App uploaded');
+    setPercent(null);
+    if (done) { setFile(null); setVersion(''); setNotes(''); void reload(); }
+  };
+  return (
+    <div className="max-w-2xl space-y-3">
+      <Card className="p-4">
+        <CardHeader title="Android app" hint="Staff download it from the link below or by scanning the QR code. Uploading a new version replaces the old one; no redeploy is needed." />
+        {apk ? (
+          <div className="mt-2 flex flex-wrap items-center gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
+            <div className="min-w-0 flex-1 text-sm">
+              <p className="font-medium text-ink">Version {apk.version} · {mb(apk.size)}</p>
+              <p className="text-[13px] text-muted">Uploaded {dateTime(apk.uploaded_at)} by {apk.uploaded_by}{apk.notes ? ` · ${apk.notes}` : ''}</p>
+            </div>
+            <a href="/app/download"><Button size="sm">Download</Button></a>
+            <Button size="sm" variant="ghost" onClick={() => setRemoving(true)}><Trash2 size={14} />Remove</Button>
+          </div>
+        ) : <Notice>No Android app uploaded yet. The download page says it is coming soon, and the sign-in page shows no button.</Notice>}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <TextField label="Version" required placeholder="e.g. 1.2.0" maxLength={20} value={version} onChange={(e) => setVersion(e.target.value)} />
+          <TextField label="What's new (optional)" maxLength={300} placeholder="e.g. Faster calling screen" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm hover:bg-surface-2">
+            <input type="file" accept=".apk,application/vnd.android.package-archive" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            {file ? `${file.name} · ${mb(file.size)}` : 'Choose the .apk file'}
+          </label>
+          <Button variant="primary" busy={busy} disabled={!file || !version.trim()} onClick={upload}>{apk ? 'Upload new version' : 'Upload app'}</Button>
+        </div>
+        {percent !== null && (
+          <div className="mt-3" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
+            <div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full bg-brand transition-[width]" style={{ width: `${percent}%` }} /></div>
+            <p className="mt-1 text-[13px] text-muted">{percent < 100 ? `Uploading… ${percent}%` : 'Checking the file…'}</p>
+          </div>
+        )}
+      </Card>
+
+      <Card className="p-4">
+        <CardHeader title="Download page" hint="Share this link on WhatsApp, or show the QR code at the office." />
+        <div className="mt-2 flex flex-wrap items-center gap-4">
+          <img src="/app/qr.svg" alt="QR code for the download page" className="size-32 rounded-lg border border-line bg-white p-1" />
+          <div className="min-w-0 space-y-2">
+            <code className="block break-all text-sm text-ink">{data.download_page}</code>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => run(async () => { await navigator.clipboard.writeText(data.download_page); }, 'Link copied')}><Copy size={14} />Copy link</Button>
+              <a href="/app" target="_blank" rel="noreferrer"><Button size="sm" variant="ghost">Open page</Button></a>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-4">
+        <CardHeader title="iPhone app" hint="When the iPhone app is ready on TestFlight or the App Store, paste its link here. Until then, iPhone users are shown how to add the CRM to their home screen." />
+        <div className="mt-2 flex gap-2">
+          <Input aria-label="iPhone app link" placeholder="https://testflight.apple.com/join/…" value={ios ?? data.links.ios_url} onChange={(e) => setIos(e.target.value)} />
+          <Button busy={busy} onClick={() => run(async () => { await api.put('/mobile-app/links', { ios_url: (ios ?? data.links.ios_url).trim() }); setIos(null); await reload(); }, 'Saved')}>Save</Button>
+        </div>
+      </Card>
+
+      {removing && (
+        <Modal title="Remove the Android app?" onClose={() => setRemoving(false)}>
+          <p className="text-sm text-ink">Staff will no longer be able to download it. Phones that already have it keep working.</p>
+          <div className="mt-3 flex justify-end gap-2">
+            <Button onClick={() => setRemoving(false)}>Cancel</Button>
+            <Button variant="primary" busy={busy} onClick={() => run(async () => { await api.del('/mobile-app/apk'); setRemoving(false); await reload(); }, 'App removed')}>Remove</Button>
+          </div>
+        </Modal>
+      )}
+    </div>
   );
 }
 
@@ -619,7 +711,7 @@ export default function Settings() {
   const { data, error, loading, reload } = useApi('/settings');
   if (loading) return <Spinner />;
   if (error || !data) return <Page><ErrorNote>{error}</ErrorNote></Page>;
-  const tabs = TABS.filter((t) => t !== 'Features' || data.is_admin); // Only an administrator switches features.
+  const tabs = TABS.filter((t) => !['Features', 'Mobile app'].includes(t) || data.is_admin); // Administrators only.
   const current = tab ?? tabs[0];
   return (
     <Page>
@@ -631,6 +723,7 @@ export default function Settings() {
         ))}
       </div>
       {current === 'Features' && <FeatureSwitches />}
+      {current === 'Mobile app' && <MobileAppSettings />}
       {current === 'Rules' && <Rules initial={data.settings} />}
       {current === 'Alerts' && <AlertRules initial={data.settings.alert_rules} onSaved={reload} />}
       {current === 'Workflows' && <Workflows />}

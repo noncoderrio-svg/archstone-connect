@@ -23,6 +23,7 @@ import { routing } from './routes/routing.ts';
 import { sales } from './routes/sales.ts';
 import { webhooks } from './routes/webhooks.ts';
 import { workplace } from './routes/workplace.ts';
+import { appPublic, mobileApp } from './routes/mobileApp.ts';
 import { config } from './config.ts';
 import { tickOnce } from './services/scheduler.ts';
 
@@ -68,6 +69,9 @@ export function createApp() {
 
   app.use('/webhooks', rateLimit(300), webhooks);
   app.use(legal);
+  // Limited per address on its own paths only, so the rest of the app keeps its own limits.
+  app.use(['/app', '/public/app-info', '/archstone-connect-app.apk'], rateLimit(120));
+  app.use(appPublic);
   // Hosts that pause idle apps (such as shared Node.js hosting) call this from a cron job every minute.
   app.get('/cron/tick', rateLimit(30), async (req, res, next) => {
     const token = String(req.query.token ?? req.get('x-cron-token') ?? '');
@@ -81,7 +85,7 @@ export function createApp() {
   });
   app.use('/api', rateLimit(1200), publicAuth, publicGoogle);
   app.use('/public', rateLimit(600), publicMedia, publicBuyer);
-  app.use('/api', requireAuth, erase, admin, control, insights, dialer, account, postsales, payments, partners, growth, routing, crm, sales, messaging, workplace);
+  app.use('/api', requireAuth, erase, admin, control, insights, dialer, account, postsales, payments, partners, growth, routing, crm, sales, messaging, workplace, mobileApp);
   app.use('/api', (_req, _res, next) => next(new HttpError(404, 'Not found.')));
 
   const dist = resolve('dist');

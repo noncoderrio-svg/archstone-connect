@@ -22,6 +22,9 @@ export interface Harness {
   ids: Record<string, number>;
   call: (method: string, path: string, who: string, body?: unknown) => Promise<{ status: number; data: any }>;
   addUser: (who: string, role: string, projectIds?: number[]) => Promise<number>;
+  /** The running server's address and a signed-in person's cookie, for requests that are not JSON (file uploads, downloads). */
+  base: string;
+  cookie: (who: string) => string;
   stop: () => void;
 }
 
@@ -65,7 +68,7 @@ export async function startHarness(dir: string): Promise<Harness> {
   }
 
   return {
-    db, ids, call, addUser,
+    db, ids, call, addUser, base, cookie: (who: string) => session[who] ?? '',
     stop: () => {
       server.close();
       server.closeAllConnections();

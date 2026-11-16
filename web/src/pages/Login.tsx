@@ -1,11 +1,25 @@
-import { Download, Share } from 'lucide-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { Download, Share, Smartphone } from 'lucide-react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Button, ErrorNote, Logo, TextField } from '../components/ui.tsx';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { useInstallApp } from '../lib/install.ts';
 
 /** Installs the site as a phone/desktop app straight from the browser, so no APK download is needed. */
+/** Shown once an admin has uploaded the Android app (or set an iPhone link). */
+function DownloadApp() {
+  const [info, setInfo] = useState<{ android: { version: string; size: number } | null; ios_url: string } | null>(null);
+  useEffect(() => {
+    fetch('/public/app-info').then((r) => (r.ok ? r.json() : null)).then(setInfo).catch(() => undefined);
+  }, []);
+  if (!info?.android && !info?.ios_url) return null;
+  return (
+    <a href="/app" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-[#e86920] px-3 py-2.5 text-sm font-medium text-brand-ink hover:bg-brand-soft">
+      <Smartphone size={16} /> Download the mobile app{info.android ? ` (${(info.android.size / 1048576).toFixed(0)} MB)` : ''}
+    </a>
+  );
+}
+
 function InstallApp() {
   const { canPrompt, iosHint, install } = useInstallApp();
   if (canPrompt) {
@@ -103,6 +117,7 @@ export function Login() {
         )}
         <Button type="submit" variant="primary" busy={busy} className="w-full">{needsCode ? 'Verify' : 'Sign in'}</Button>
       </form>
+      <DownloadApp />
       <InstallApp />
       <p className="mt-5 text-center text-[13px] text-muted">
         {demoMode ? 'Demo installation.' : ''} Accounts are created by your administrator.

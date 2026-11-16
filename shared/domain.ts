@@ -275,6 +275,7 @@ export const ADDED_ACTIONS: { version: number; actions: Action[]; when?: Action 
 export const FEATURES = [
   { key: 'bulletin', label: 'Bulletin bar', hint: 'Scrolling messages under the top bar: targets, launches, offers, birthdays.', default: true },
   { key: 'duty', label: 'Weekly offs, shifts and duty-aware assignment', hint: 'New leads go only to people on duty today. Absent people can hand their follow-ups to a teammate.', default: false },
+  { key: 'app', label: 'Mobile app download', hint: 'The /app download page with a QR code, and a download button on the sign-in page. Upload the app in Settings → Mobile app.', default: true },
   { key: 'kyc', label: 'KYC number checks', hint: 'Aadhaar is checked and kept as the last 4 digits only. PAN is format-checked. Who opens a lead or a document is logged.', default: true },
 ] as const;
 export type FeatureKey = (typeof FEATURES)[number]['key'];
