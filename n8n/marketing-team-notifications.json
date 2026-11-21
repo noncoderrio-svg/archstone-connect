@@ -1,0 +1,23 @@
+{
+  "name": "Archstone: marketing team notifications",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "archstone-marketing-events", "options": {} },
+      "id": "c1", "name": "Event from the CRM", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 0]
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "typeValidation": "loose" }, "combinator": "and", "conditions": [
+        { "leftValue": "={{ $json.body.type }}", "rightValue": "approval_needed", "operator": { "type": "string", "operation": "equals" } }
+      ] } },
+      "id": "c2", "name": "Is an approval needed?", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [220, 0]
+    },
+    { "parameters": {}, "id": "c3", "name": "Replace me: tell the owner an approval is waiting", "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [440, -80] },
+    { "parameters": {}, "id": "c4", "name": "Replace me: share the report with the team", "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [440, 80] }
+  ],
+  "connections": {
+    "Event from the CRM": { "main": [[{ "node": "Is an approval needed?", "type": "main", "index": 0 }]] },
+    "Is an approval needed?": { "main": [[{ "node": "Replace me: tell the owner an approval is waiting", "type": "main", "index": 0 }], [{ "node": "Replace me: share the report with the team", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "timezone": "Asia/Kolkata" },
+  "active": false
+}

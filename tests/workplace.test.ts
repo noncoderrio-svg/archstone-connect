@@ -47,7 +47,7 @@ test('only an administrator sees and changes the feature switches, and the sessi
   assert.equal(before.status, 200);
   assert.equal(before.data.features.duty, false, 'duty-aware assignment starts off');
   assert.equal((await as('admin').put('/api/features', { ...allOn, duty: false, bulletin: false })).status, 200);
-  assert.deepEqual((await as('t1').get('/api/auth/me')).data.features, { bulletin: false, duty: false, kyc: true, app: true });
+  assert.deepEqual((await as('t1').get('/api/auth/me')).data.features, { bulletin: false, duty: false, kyc: true, app: true, marketing: false });
   assert.equal((await as('cm').get('/api/duty')).status, 404, 'a switched-off feature cannot be reached by a direct link');
   assert.deepEqual((await as('t1').get('/api/bulletins/current')).data.bulletins, []);
   const log = h.db.get(`SELECT detail FROM audit_log WHERE action = 'settings.features' ORDER BY id DESC`);

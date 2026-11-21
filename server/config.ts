@@ -46,6 +46,12 @@ export const config = {
   metaAppId: env('META_APP_ID'),
   whatsappDisplayNumber: env('WHATSAPP_DISPLAY_NUMBER').replace(/\D/g, ''),
   googleAdsKey: env('GOOGLE_ADS_WEBHOOK_KEY'),
+  /** Claude, an optional second brain for the AI marketing team. */
+  anthropic: { key: env('ANTHROPIC_API_KEY'), model: env('ANTHROPIC_MODEL', 'claude-opus-5-5') },
+  /** Meta Marketing API: a System User token with ads_read and ads_management, never a personal token. */
+  metaAds: { apiVersion: env('META_ADS_API_VERSION', 'v27.0'), token: env('META_ADS_TOKEN'), accountId: env('META_AD_ACCOUNT_ID').replace(/^act_/, ''), pageId: env('META_ADS_PAGE_ID'), instagramId: env('META_ADS_INSTAGRAM_ID') },
+  /** n8n calls /webhooks/automation with this key, and the CRM posts marketing events to the address. */
+  automation: { key: env('AUTOMATION_API_KEY'), eventsUrl: env('AUTOMATION_EVENTS_URL') },
   smtp: {
     host: env('SMTP_HOST'),
     port: Number(env('SMTP_PORT', '587')),

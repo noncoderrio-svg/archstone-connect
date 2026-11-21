@@ -570,6 +570,84 @@ CREATE TABLE IF NOT EXISTS bulletins (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+db.exec(`
+CREATE TABLE IF NOT EXISTS mkt_briefs (
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  title TEXT NOT NULL,
+  goal TEXT NOT NULL DEFAULT '',
+  budget_inr REAL NOT NULL,
+  days INTEGER NOT NULL DEFAULT 14,
+  notes TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'draft',
+  stage TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS mkt_runs (
+  id INTEGER PRIMARY KEY,
+  brief_id INTEGER REFERENCES mkt_briefs(id) ON DELETE CASCADE,
+  agent TEXT NOT NULL,
+  status TEXT NOT NULL,
+  output TEXT NOT NULL DEFAULT '{}',
+  provider TEXT NOT NULL DEFAULT '',
+  model TEXT NOT NULL DEFAULT '',
+  simulated INTEGER NOT NULL DEFAULT 0,
+  error TEXT NOT NULL DEFAULT '',
+  ms INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mkt_runs_brief ON mkt_runs(brief_id);
+CREATE TABLE IF NOT EXISTS mkt_plans (
+  id INTEGER PRIMARY KEY,
+  brief_id INTEGER NOT NULL REFERENCES mkt_briefs(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  issues TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'draft',
+  meta_campaign_id TEXT NOT NULL DEFAULT '',
+  meta_ids TEXT NOT NULL DEFAULT '{}',
+  simulated INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS mkt_actions (
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL,
+  plan_id INTEGER REFERENCES mkt_plans(id) ON DELETE CASCADE,
+  campaign TEXT NOT NULL DEFAULT '',
+  payload TEXT NOT NULL DEFAULT '{}',
+  reason TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  result TEXT NOT NULL DEFAULT '',
+  reviewed_by INTEGER REFERENCES users(id),
+  reviewed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS mkt_insights (
+  day TEXT NOT NULL,
+  campaign_id TEXT NOT NULL,
+  campaign TEXT NOT NULL,
+  spend REAL NOT NULL DEFAULT 0,
+  impressions INTEGER NOT NULL DEFAULT 0,
+  reach INTEGER NOT NULL DEFAULT 0,
+  clicks INTEGER NOT NULL DEFAULT 0,
+  leads INTEGER NOT NULL DEFAULT 0,
+  simulated INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (day, campaign_id)
+);
+CREATE TABLE IF NOT EXISTS mkt_reports (
+  id INTEGER PRIMARY KEY,
+  period TEXT NOT NULL,
+  from_day TEXT NOT NULL,
+  to_day TEXT NOT NULL,
+  data TEXT NOT NULL,
+  simulated INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`);
 addColumn('site_visits', 'confirmed_at', 'TEXT');
 addColumn('site_visits', 'reschedules', 'INTEGER NOT NULL DEFAULT 0');
 addColumn('site_visits', 'next_step', `TEXT NOT NULL DEFAULT ''`);

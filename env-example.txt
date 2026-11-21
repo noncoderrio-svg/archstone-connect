@@ -75,3 +75,17 @@ GOOGLE_CLIENT_SECRET=
 
 # Secret for the cron wake-up link (/cron/tick?token=...). Use a long random value.
 CRON_TOKEN=
+
+# AI marketing team (all optional, and better set in Settings, Integrations, where they are stored encrypted)
+# Claude, from console.anthropic.com. Without it the team uses Gemini.
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=claude-opus-5-5
+# Meta Ads Manager: a System User token with ads_read and ads_management, never a personal token
+META_ADS_TOKEN=
+META_AD_ACCOUNT_ID=
+META_ADS_PAGE_ID=
+META_ADS_INSTAGRAM_ID=
+META_ADS_API_VERSION=v27.0
+# n8n: the key it sends in X-Api-Key, and where the CRM posts marketing events
+AUTOMATION_API_KEY=
+AUTOMATION_EVENTS_URL=

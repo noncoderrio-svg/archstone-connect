@@ -14,6 +14,7 @@ import { buildReport, reportPdf, reportWorkbook, summaryLine } from './reports.t
 import { dataDir } from './secrets.ts';
 import { formatIst, processQueue, queueCampaign, sendAutomation, sendToStaff } from './whatsapp.ts';
 import { runIdleWorkflows } from './workflows.ts';
+import { marketingTick } from './marketing/pipeline.ts';
 
 export function releaseExpiredHolds() {
   const expired = all<any>(`SELECT id FROM units WHERE status = 'Hold' AND hold_until <= ?`, nowIso());
@@ -314,6 +315,7 @@ export async function tick() {
   await runIdleWorkflows();
   void syncMetaLeads().catch((e) => console.error('Meta pull failed:', e.message));
   void sendFeedback().catch((e) => console.error('Meta feedback failed:', e.message));
+  void marketingTick().catch((e) => console.error('Marketing team failed:', e.message));
   void checkPendingTemplates().catch((e) => console.error('Template status check failed:', e.message));
   await sendVisitReminders();
   await sendPaymentReminders();

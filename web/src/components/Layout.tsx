@@ -36,6 +36,7 @@ const NAV: NavItem[] = [
   { to: '/bookings', label: 'Bookings', icon: <ReceiptIndianRupee size={19} />, group: 'Sales', roles: [...BOOKING_ROLES] },
   { to: '/payments', label: 'Payment Follow-up', icon: <Wallet size={19} />, group: 'Sales', need: 'payment.followup' },
   { to: '/routing', label: 'Lead Routing', icon: <Route size={19} />, group: 'Growth', need: 'settings.manage' },
+  { to: '/marketing', label: 'Marketing AI', icon: <Sparkles size={19} />, group: 'Growth', show: ({ can, on }) => on('marketing') && can('marketing.use') },
   { to: '/campaigns', label: 'Broadcasts', icon: <Megaphone size={19} />, group: 'Growth', need: 'campaign.create' },
   { to: '/partners', label: 'Channel Partners', icon: <Handshake size={19} />, group: 'Growth', need: 'partner.manage' },
   { to: '/redevelopment', label: 'Redevelopment', icon: <Landmark size={19} />, group: 'Growth', need: 'redevelopment.manage' },

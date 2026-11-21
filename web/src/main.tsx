@@ -36,6 +36,7 @@ const Payments = lazyPage(() => import('./pages/Payments.tsx'));
 const Receipt = lazyPage(() => import('./pages/Bookings.tsx').then((m) => ({ default: m.Receipt })));
 const CostSheet = lazyPage(() => import('./pages/CostSheet.tsx'));
 const Partners = lazyPage(() => import('./pages/Partners.tsx'));
+const Marketing = lazyPage(() => import('./pages/Marketing.tsx'));
 const Redevelopment = lazyPage(() => import('./pages/Redevelopment.tsx'));
 const TwoFactorSetup = lazyPage(() => import('./pages/Account.tsx').then((m) => ({ default: m.TwoFactorSetup })));
 
@@ -99,6 +100,7 @@ function Root() {
           <Route path="bookings" element={<Lazy><Bookings /></Lazy>} />
           <Route path="payments" element={<Lazy><Payments /></Lazy>} />
           <Route path="partners" element={<Lazy><Partners /></Lazy>} />
+          <Route path="marketing" element={<Lazy><Marketing /></Lazy>} />
           <Route path="redevelopment" element={<Lazy><Redevelopment /></Lazy>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

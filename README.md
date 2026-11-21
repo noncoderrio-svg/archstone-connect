@@ -116,6 +116,12 @@ To connect Meta, add your page ID and page access token under **Meta pages**, se
 
 Meta form answers about home size and budget fill the lead's requirement automatically, so **Matching homes** works from the first minute. Managers can add notes on a lead that agents never see.
 
+## AI marketing team
+
+Switch it on in **Settings → Features**, then open **Marketing AI**. Eight agents plan Meta campaigns from a brief, write the ads, read results and write reports. Campaigns are created in Meta as PAUSED, and nothing is switched on, paused or re-budgeted without an approval on the Approvals tab. Without an AI key, demo mode shows sample work marked Simulated.
+
+Set-up steps, the rules the agents cannot break, and what has not yet been tested against the real services are in `docs/AI-MARKETING.md`. Workflows for n8n are in the `n8n` folder.
+
 ## Team structure
 
 In **Team → Structure**, see everyone's reporting line. Edit a person and set **Reports to**.

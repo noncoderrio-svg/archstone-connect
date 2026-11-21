@@ -8,6 +8,9 @@ import { ingestLead } from '../services/leads.ts';
 import { pullMetaLead } from '../services/metaLeads.ts';
 import { finishCall } from '../services/telephony.ts';
 import { handleWebhook, sendAutomation, verifySignature } from '../services/whatsapp.ts';
+import { audit } from '../services/core.ts';
+import { report, review, snapshot, syncInsights } from '../services/marketing/pipeline.ts';
+import { featureOn } from '../services/workplace.ts';
 
 export const webhooks = Router();
 
@@ -148,6 +151,23 @@ webhooks.post('/telephony/:token', express.urlencoded({ extended: false }), (req
   const duration = Number(b.ConversationDuration ?? b.Duration ?? b.DialCallDuration);
   finishCall(String(b.CallSid ?? ''), String(b.Status ?? 'failed'), Number.isFinite(duration) ? duration : null, String(b.RecordingUrl ?? ''));
   res.sendStatus(200);
+});
+
+// ---------- n8n automation ----------
+// n8n may ask the AI team to do its read-and-report work. It can never approve or change a campaign.
+webhooks.post('/automation/marketing', async (req, res) => {
+  const expected = Buffer.from(config.automation.key);
+  const given = Buffer.from(req.header('x-api-key') ?? '');
+  if (!expected.length) throw new HttpError(503, 'Automation is not connected yet.');
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) throw new HttpError(401, 'Invalid API key.');
+  if (!featureOn('marketing')) throw new HttpError(404, 'The AI marketing team is switched off.');
+  const { job } = z.object({ job: z.enum(['sync', 'review', 'daily', 'weekly', 'monthly', 'status']) }).parse(req.body);
+  audit(null, 'marketing.automation', 'mkt_report', '', job);
+  if (job === 'sync') return res.json(await syncInsights());
+  if (job === 'review') { const r = await review(7); return res.json({ headline: r.analysis.headline, proposed: r.proposed, simulated: r.simulated }); }
+  if (job === 'status') { const s = snapshot(1); return res.json({ totals: s.totals, pipeline: s.pipeline, simulated: s.simulated }); }
+  const r = await report(job);
+  res.json({ title: r.title, status: r.status, urgent: r.urgent, next_priorities: r.next_priorities, totals: r.totals, pipeline: r.pipeline, approval_required: r.approval_required.length, simulated: r.simulated });
 });
 
 // ---------- Meta Lead Ads ----------

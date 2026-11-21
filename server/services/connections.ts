@@ -53,6 +53,14 @@ const FIELDS: Field[] = [
   { key: 'smtp_user', label: 'Username', path: 'smtp.user' },
   { key: 'smtp_pass', label: 'Password', path: 'smtp.pass', secret: true, hint: 'For Gmail, use an app password.' },
   { key: 'smtp_from', label: 'Send from', path: 'smtp.from', placeholder: 'Archstone <crm@yourcompany.com>' },
+  { key: 'claude_key', label: 'API key', path: 'anthropic.key', secret: true, hint: 'From console.anthropic.com. Optional: without it the AI marketing team uses Gemini.' },
+  { key: 'claude_model', label: 'Model', path: 'anthropic.model', pattern: /^[\w.-]+$/, rule: 'use a model name such as claude-opus-5-5.', hint: 'Leave empty to use claude-opus-5-5.' },
+  { key: 'ads_token', label: 'System User access token', path: 'metaAds.token', secret: true, hint: 'From Meta Business Settings, System Users. It needs ads_read and ads_management on your ad account.' },
+  { key: 'ads_account', label: 'Ad account ID', path: 'metaAds.accountId', ...DIGITS, hint: 'The number after act_ in Ads Manager.' },
+  { key: 'ads_page', label: 'Facebook Page ID', path: 'metaAds.pageId', ...DIGITS, hint: 'The page your ads run from.' },
+  { key: 'ads_instagram', label: 'Instagram account ID', path: 'metaAds.instagramId', ...DIGITS, hint: 'Optional. Needed for ads that show your Instagram handle.' },
+  { key: 'automation_key', label: 'Automation key', path: 'automation.key', secret: true, generate: true, hint: 'n8n sends this in the X-Api-Key header.' },
+  { key: 'automation_events', label: 'n8n events address', path: 'automation.eventsUrl', pattern: /^https?:\/\/\S+$/, rule: 'enter a full address starting with https://.', hint: 'Optional. The CRM posts marketing reports and approval requests here.' },
   { key: 'google_ads_key', label: 'Webhook key', path: 'googleAdsKey', secret: true, generate: true, hint: 'Enter the same key in your Google Ads lead form.' },
 ];
 
@@ -120,6 +128,18 @@ const CONNECTIONS = [
   {
     key: 'gemini', name: 'Gemini AI', fields: ['gemini_key', 'gemini_model'],
     connected: () => Boolean(config.gemini.key), detail: () => (config.gemini.key ? config.gemini.model : 'Add a key to turn on AI drafts'),
+  },
+  {
+    key: 'claude', name: 'Claude AI', fields: ['claude_key', 'claude_model'],
+    connected: () => Boolean(config.anthropic.key), detail: () => (config.anthropic.key ? config.anthropic.model : 'Optional second brain for the AI marketing team'),
+  },
+  {
+    key: 'meta_ads', name: 'Meta Ads Manager', fields: ['ads_token', 'ads_account', 'ads_page', 'ads_instagram'],
+    connected: () => Boolean(config.metaAds.token && config.metaAds.accountId), detail: () => (config.metaAds.token && config.metaAds.accountId ? `Ad account ${config.metaAds.accountId}` : 'Campaigns and results stay simulated until this is connected'),
+  },
+  {
+    key: 'automation', name: 'n8n automation', fields: ['automation_key', 'automation_events'], address: '/webhooks/automation/marketing',
+    connected: () => Boolean(config.automation.key),
   },
   {
     key: 'email', name: 'Email (SMTP)', fields: ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'],

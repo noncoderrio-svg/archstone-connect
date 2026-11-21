@@ -1,0 +1,44 @@
+{
+  "name": "Archstone: daily marketing report",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "5 9 * * *" }] } },
+      "id": "a1", "name": "Every day at 9:05", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://YOUR-CRM-ADDRESS/webhooks/automation/marketing",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendBody": true, "specifyBody": "json", "jsonBody": "{ \"job\": \"sync\" }", "options": { "timeout": 120000 }
+      },
+      "id": "a2", "name": "Update results from Meta", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [220, 0],
+      "credentials": { "httpHeaderAuth": { "name": "Archstone CRM automation key" } }
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://YOUR-CRM-ADDRESS/webhooks/automation/marketing",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendBody": true, "specifyBody": "json", "jsonBody": "{ \"job\": \"daily\" }", "options": { "timeout": 180000 }
+      },
+      "id": "a3", "name": "Write the daily report", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [440, 0],
+      "credentials": { "httpHeaderAuth": { "name": "Archstone CRM automation key" } }
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "typeValidation": "loose" }, "combinator": "or", "conditions": [
+        { "leftValue": "={{ $json.urgent.length }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } },
+        { "leftValue": "={{ $json.approval_required }}", "rightValue": 0, "operator": { "type": "number", "operation": "gt" } }
+      ] } },
+      "id": "a4", "name": "Anything urgent or waiting?", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [660, 0]
+    },
+    { "parameters": {}, "id": "a5", "name": "Replace me: send to WhatsApp, email or Slack", "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [880, -80] },
+    { "parameters": {}, "id": "a6", "name": "Nothing urgent", "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [880, 80] }
+  ],
+  "connections": {
+    "Every day at 9:05": { "main": [[{ "node": "Update results from Meta", "type": "main", "index": 0 }]] },
+    "Update results from Meta": { "main": [[{ "node": "Write the daily report", "type": "main", "index": 0 }]] },
+    "Write the daily report": { "main": [[{ "node": "Anything urgent or waiting?", "type": "main", "index": 0 }]] },
+    "Anything urgent or waiting?": { "main": [[{ "node": "Replace me: send to WhatsApp, email or Slack", "type": "main", "index": 0 }], [{ "node": "Nothing urgent", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "timezone": "Asia/Kolkata" },
+  "active": false
+}

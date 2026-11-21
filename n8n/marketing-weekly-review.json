@@ -1,0 +1,35 @@
+{
+  "name": "Archstone: weekly review and lead quality",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "cronExpression", "expression": "15 9 * * 1" }] } },
+      "id": "b1", "name": "Every Monday at 9:15", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://YOUR-CRM-ADDRESS/webhooks/automation/marketing",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendBody": true, "specifyBody": "json", "jsonBody": "{ \"job\": \"review\" }", "options": { "timeout": 180000 }
+      },
+      "id": "b2", "name": "Analyst and Optimization review", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [220, 0],
+      "credentials": { "httpHeaderAuth": { "name": "Archstone CRM automation key" } }
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "https://YOUR-CRM-ADDRESS/webhooks/automation/marketing",
+        "authentication": "genericCredentialType", "genericAuthType": "httpHeaderAuth",
+        "sendBody": true, "specifyBody": "json", "jsonBody": "{ \"job\": \"weekly\" }", "options": { "timeout": 180000 }
+      },
+      "id": "b3", "name": "Write the weekly report", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [440, 0],
+      "credentials": { "httpHeaderAuth": { "name": "Archstone CRM automation key" } }
+    },
+    { "parameters": {}, "id": "b4", "name": "Replace me: send the summary to the marketing team", "type": "n8n-nodes-base.noOp", "typeVersion": 1, "position": [660, 0] }
+  ],
+  "connections": {
+    "Every Monday at 9:15": { "main": [[{ "node": "Analyst and Optimization review", "type": "main", "index": 0 }]] },
+    "Analyst and Optimization review": { "main": [[{ "node": "Write the weekly report", "type": "main", "index": 0 }]] },
+    "Write the weekly report": { "main": [[{ "node": "Replace me: send the summary to the marketing team", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "timezone": "Asia/Kolkata" },
+  "active": false
+}

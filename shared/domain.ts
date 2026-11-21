@@ -223,6 +223,13 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    group: 'Marketing AI',
+    items: [
+      ['marketing.use', 'Use the AI marketing team: briefs, drafts and reports'],
+      ['marketing.approve', 'Approve what the AI team sends to Meta, including budgets'],
+    ],
+  },
+  {
     group: 'Workplace',
     items: [
       ['bulletin.view', 'See the bulletin bar'],
@@ -277,6 +284,7 @@ export const FEATURES = [
   { key: 'duty', label: 'Weekly offs, shifts and duty-aware assignment', hint: 'New leads go only to people on duty today. Absent people can hand their follow-ups to a teammate.', default: false },
   { key: 'app', label: 'Mobile app download', hint: 'The /app download page with a QR code, and a download button on the sign-in page. Upload the app in Settings → Mobile app.', default: true },
   { key: 'kyc', label: 'KYC number checks', hint: 'Aadhaar is checked and kept as the last 4 digits only. PAN is format-checked. Who opens a lead or a document is logged.', default: true },
+  { key: 'marketing', label: 'AI marketing team', hint: 'Eight AI agents that plan Meta campaigns, write ads, read results and report. Nothing reaches Meta or spends money without an approval.', default: false },
 ] as const;
 export type FeatureKey = (typeof FEATURES)[number]['key'];
 export type FeatureSwitches = Record<FeatureKey, boolean>;

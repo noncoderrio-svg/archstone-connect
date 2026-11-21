@@ -23,8 +23,10 @@ workplace.get('/features', (req, res) => {
 
 workplace.put('/features', (req, res) => {
   if (req.user.role !== 'admin') throw new HttpError(403, 'Only an administrator can change features.');
-  const b = z.object(Object.fromEntries(FEATURES.map((f) => [f.key, z.boolean()])) as Record<keyof FeatureSwitches, z.ZodBoolean>).parse(req.body);
+  // A screen opened before a new feature was added does not send it, so anything missing keeps its current value.
+  const sent = z.object(Object.fromEntries(FEATURES.map((f) => [f.key, z.boolean().optional()])) as Record<keyof FeatureSwitches, z.ZodOptional<z.ZodBoolean>>).parse(req.body);
   const before = features();
+  const b = Object.fromEntries(FEATURES.map((f) => [f.key, sent[f.key] ?? before[f.key]])) as FeatureSwitches;
   setSetting('features', b);
   const changed = FEATURES.filter((f) => before[f.key] !== b[f.key]).map((f) => `${f.key} ${b[f.key] ? 'on' : 'off'}`);
   if (changed.length) audit(req, 'settings.features', 'settings', '', changed.join(', '));
